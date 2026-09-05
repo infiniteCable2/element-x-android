@@ -33,6 +33,17 @@ class AppUpdateManifestTest {
     }
 
     @Test
+    fun `resolve accepts an APK beside the latest GitHub release manifest`() {
+        val manifestUrl = "https://github.com/infiniteCable2/element-x-android/releases/latest/download/update.json"
+
+        val result = aManifest(versionCode = 43).resolve(42, manifestUrl)
+
+        assertThat(result?.apkUrl).isEqualTo(
+            "https://github.com/infiniteCable2/element-x-android/releases/latest/download/infinitecable2-matrix.apk"
+        )
+    }
+
+    @Test
     fun `resolve rejects paths and invalid checksums`() {
         assertThrows(IllegalArgumentException::class.java) {
             aManifest(apk = "../outside.apk").resolve(42, A_MANIFEST_URL)

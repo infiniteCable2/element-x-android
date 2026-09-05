@@ -25,7 +25,7 @@ android {
     defaultConfig {
         val updateManifestUrl = providers.environmentVariable("ELEMENT_X_UPDATE_MANIFEST_URL").orNull
             ?: readLocalProperty("updateManifestUrl")
-            ?: "https://raw.githubusercontent.com/infiniteCable2/element-x-android/develop/release/update.json"
+            ?: "https://github.com/infiniteCable2/element-x-android/releases/latest/download/update.json"
         buildConfigFieldStr(
             name = "UPDATE_MANIFEST_URL",
             value = updateManifestUrl,
