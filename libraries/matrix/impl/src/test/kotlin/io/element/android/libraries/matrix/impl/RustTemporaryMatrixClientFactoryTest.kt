@@ -8,8 +8,11 @@
 package io.element.android.libraries.matrix.impl
 
 import com.google.common.truth.Truth.assertThat
+import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.libraries.featureflag.test.FakeFeatureFlagService
 import io.element.android.libraries.matrix.impl.auth.FakeProxyProvider
+import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClient
+import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClientBuilder
 import io.element.android.libraries.matrix.impl.paths.SessionPathsFactory
 import io.element.android.libraries.matrix.impl.room.FakeTimelineEventFilterFactory
 import io.element.android.libraries.matrix.impl.storage.FakeSqliteStoreBuilderProvider
@@ -29,8 +32,15 @@ class RustTemporaryMatrixClientFactoryTest {
     @Test
     fun `create returns a TemporaryMatrixClient`() = runTest {
         val sut = createRustTemporaryMatrixClientFactory()
-        val result = sut.create("https://matrix.org")
+        val result = sut.create(LockedHomeserverPolicy.configuredHomeserverUrl)
         assertThat(result.isSuccess).isTrue()
+    }
+
+    @Test
+    fun `create rejects another homeserver before building a client`() = runTest {
+        val sut = createRustTemporaryMatrixClientFactory()
+        val result = sut.create("https://other.example")
+        assertThat(result.isFailure).isTrue()
     }
 
     @Test
@@ -42,7 +52,7 @@ class RustTemporaryMatrixClientFactoryTest {
                 )
             )
         )
-        val result = sut.create("https://matrix.org")
+        val result = sut.create(LockedHomeserverPolicy.configuredHomeserverUrl)
         assertThat(result.isFailure).isTrue()
     }
 
@@ -61,7 +71,14 @@ class RustTemporaryMatrixClientFactoryTest {
         sessionStore: SessionStore = InMemorySessionStore(
             updateUserProfileResult = { _, _, _ -> },
         ),
-        clientBuilderProvider: ClientBuilderProvider = FakeClientBuilderProvider(),
+        clientBuilderProvider: ClientBuilderProvider = FakeClientBuilderProvider {
+            FakeFfiClientBuilder {
+                FakeFfiClient(
+                    homeserver = LockedHomeserverPolicy.configuredHomeserverUrl,
+                    withUtdHook = {},
+                )
+            }
+        },
         workManagerScheduler: FakeWorkManagerScheduler = FakeWorkManagerScheduler(),
     ) = RustMatrixClientFactory(
         cacheDirectory = cacheDirectory,

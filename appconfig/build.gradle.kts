@@ -1,5 +1,7 @@
 import config.BuildTimeConfig
 import extension.buildConfigFieldStr
+import extension.readLocalProperty
+import extension.testCommonDependencies
 
 /*
  * Copyright (c) 2025 Element Creations Ltd.
@@ -20,6 +22,13 @@ android {
     }
 
     defaultConfig {
+        val lockedHomeserverUrl = providers.environmentVariable("ELEMENT_X_LOCKED_HOMESERVER_URL").orNull
+            ?: readLocalProperty("lockedHomeserverUrl")
+            ?: ""
+        buildConfigFieldStr(
+            name = "LOCKED_HOMESERVER_URL",
+            value = lockedHomeserverUrl,
+        )
         buildConfigFieldStr(
             name = "URL_POLICY",
             value = if (isEnterpriseBuild) {
@@ -52,4 +61,6 @@ dependencies {
     implementation(libs.androidx.annotationjvm)
     implementation(libs.androidx.corektx)
     implementation(projects.libraries.matrix.api)
+
+    testCommonDependencies(libs)
 }

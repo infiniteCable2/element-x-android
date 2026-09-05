@@ -10,6 +10,7 @@ package io.element.android.features.enterprise.impl
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.compound.colors.SemanticColorsLightDark
 import io.element.android.features.enterprise.api.BugReportUrl
 import io.element.android.libraries.androidutils.json.JsonProvider
@@ -26,15 +27,17 @@ import org.junit.Test
 
 class DefaultEnterpriseServiceTest {
     @Test
-    fun homeserverWhitelist() {
+    fun `homeserver allow list only contains the configured homeserver`() {
         val defaultEnterpriseService = createDefaultEnterpriseService()
-        assertThat(defaultEnterpriseService.homeserverAllowList()).isEmpty()
+        assertThat(defaultEnterpriseService.homeserverAllowList())
+            .containsExactly(LockedHomeserverPolicy.configuredHomeserverUrl)
     }
 
     @Test
-    fun `isAllowedToConnectToHomeserver is true for all homeserver urls`() = runTest {
+    fun `isAllowedToConnectToHomeserver only accepts the configured host`() = runTest {
         val defaultEnterpriseService = createDefaultEnterpriseService()
-        assertThat(defaultEnterpriseService.isAllowedToConnectToHomeserver(A_HOMESERVER_URL)).isTrue()
+        assertThat(defaultEnterpriseService.isAllowedToConnectToHomeserver(LockedHomeserverPolicy.configuredHomeserverUrl)).isTrue()
+        assertThat(defaultEnterpriseService.isAllowedToConnectToHomeserver(A_HOMESERVER_URL)).isFalse()
     }
 
     @Test

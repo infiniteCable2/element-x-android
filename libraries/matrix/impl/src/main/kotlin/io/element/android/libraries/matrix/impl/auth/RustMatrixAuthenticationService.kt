@@ -11,6 +11,7 @@ package io.element.android.libraries.matrix.impl.auth
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.SingleIn
+import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.features.enterprise.api.ClientEnterpriseHook
 import io.element.android.features.enterprise.api.EnterpriseService
 import io.element.android.libraries.androidutils.crypto.ClientSecret
@@ -129,8 +130,14 @@ class RustMatrixAuthenticationService(
         withContext(coroutineDispatchers.io) {
             val emptySessionPath = rotateSessionPath()
             runCatchingExceptions {
+                LockedHomeserverPolicy.requireAllowed(homeserver)
                 val client = makeClient(sessionPaths = emptySessionPath) {
                     serverNameOrHomeserverUrl(homeserver)
+                }
+
+                if (!LockedHomeserverPolicy.isAllowed(client.homeserver())) {
+                    client.close()
+                    error("Resolved homeserver is not allowed by this application")
                 }
 
                 currentClient = client
@@ -438,7 +445,9 @@ class RustMatrixAuthenticationService(
             throw HumanQrLoginException.Unknown()
         }
 
-        return rustMatrixClientFactory
+        LockedHomeserverPolicy.requireAllowed(baseUrlOrServerName)
+
+        val client = rustMatrixClientFactory
             .getBaseClientBuilder(
                 sessionPaths = sessionPaths,
                 clientSecret = pendingKey,
@@ -447,6 +456,11 @@ class RustMatrixAuthenticationService(
             )
             .serverNameOrHomeserverUrl(baseUrlOrServerName)
             .build()
+        if (!LockedHomeserverPolicy.isAllowed(client.homeserver())) {
+            client.close()
+            error("Resolved homeserver is not allowed by this application")
+        }
+        return client
     }
 
     private fun clear(destroyClient: Boolean) {

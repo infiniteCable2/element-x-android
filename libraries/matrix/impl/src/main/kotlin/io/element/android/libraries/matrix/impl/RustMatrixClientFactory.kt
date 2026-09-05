@@ -9,6 +9,7 @@
 package io.element.android.libraries.matrix.impl
 
 import dev.zacsweers.metro.Inject
+import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.features.enterprise.api.ClientBuilderEnterpriseHook
 import io.element.android.libraries.androidutils.crypto.ClientSecret
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
@@ -78,6 +79,7 @@ class RustMatrixClientFactory(
     )
 
     suspend fun create(sessionData: SessionData): RustMatrixClient = withContext(coroutineDispatchers.io) {
+        LockedHomeserverPolicy.requireAllowed(sessionData.homeserverUrl)
         // This secret is called 'passphrase' for historical reasons, but it can be a raw key or an actual passphrase
         val clientSecret = sessionData.passphrase?.let(ClientSecret::fromString)
         val sessionPaths = sessionData.getSessionPaths()
@@ -101,6 +103,11 @@ class RustMatrixClientFactory(
             .homeserverUrl(sessionData.homeserverUrl)
             .let { (clientBuilderEnterpriseHook(RustMatrixClientBuilder(it), SessionId(sessionData.userId)) as RustMatrixClientBuilder).inner }
             .use { it.build() }
+
+        if (!LockedHomeserverPolicy.isAllowed(client.homeserver())) {
+            client.close()
+            error("Resolved homeserver is not allowed by this application")
+        }
 
         client.setMediaRetentionPolicy(
             MediaRetentionPolicy(

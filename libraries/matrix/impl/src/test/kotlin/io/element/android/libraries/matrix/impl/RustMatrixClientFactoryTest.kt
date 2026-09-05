@@ -9,9 +9,12 @@
 package io.element.android.libraries.matrix.impl
 
 import com.google.common.truth.Truth.assertThat
+import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.libraries.featureflag.test.FakeFeatureFlagService
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.impl.auth.FakeProxyProvider
+import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClient
+import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClientBuilder
 import io.element.android.libraries.matrix.impl.room.FakeTimelineEventFilterFactory
 import io.element.android.libraries.matrix.impl.storage.FakeSqliteStoreBuilderProvider
 import io.element.android.libraries.network.useragent.SimpleUserAgentProvider
@@ -36,11 +39,16 @@ class RustMatrixClientFactoryTest {
         val workManagerScheduler = FakeWorkManagerScheduler(submitLambda = scheduleVacuumLambda)
         val sut = createRustMatrixClientFactory(workManagerScheduler = workManagerScheduler)
 
-        val result = sut.create(aSessionData())
+        val result = sut.create(aSessionData().copy(homeserverUrl = LockedHomeserverPolicy.configuredHomeserverUrl))
 
         assertThat(result.sessionId).isEqualTo(SessionId("@alice:server.org"))
         scheduleVacuumLambda.assertions().isCalledOnce()
         result.destroy()
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun `create rejects a stored session for another homeserver`() = runTest {
+        createRustMatrixClientFactory().create(aSessionData())
     }
 }
 
@@ -49,7 +57,14 @@ fun TestScope.createRustMatrixClientFactory(
     sessionStore: SessionStore = InMemorySessionStore(
         updateUserProfileResult = { _, _, _ -> },
     ),
-    clientBuilderProvider: ClientBuilderProvider = FakeClientBuilderProvider(),
+    clientBuilderProvider: ClientBuilderProvider = FakeClientBuilderProvider {
+        FakeFfiClientBuilder {
+            FakeFfiClient(
+                homeserver = LockedHomeserverPolicy.configuredHomeserverUrl,
+                withUtdHook = {},
+            )
+        }
+    },
     workManagerScheduler: FakeWorkManagerScheduler = FakeWorkManagerScheduler(),
 ) = RustMatrixClientFactory(
     cacheDirectory = cacheDirectory,

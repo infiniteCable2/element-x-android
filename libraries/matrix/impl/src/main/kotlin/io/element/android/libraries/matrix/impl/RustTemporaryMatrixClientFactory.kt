@@ -9,6 +9,7 @@ package io.element.android.libraries.matrix.impl
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
+import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.libraries.core.extensions.runCatchingExceptions
 import io.element.android.libraries.core.uri.ensureProtocol
 import io.element.android.libraries.matrix.api.TemporaryMatrixClient
@@ -23,6 +24,7 @@ class RustTemporaryMatrixClientFactory(
 ) : TemporaryMatrixClientFactory {
     override suspend fun create(serverName: String): Result<TemporaryMatrixClient> {
         return runCatchingExceptions {
+            LockedHomeserverPolicy.requireAllowed(serverName)
             // In case the 'serverName' is a full URL, we need to extract the host and port to pass to the client builder.
             val parsedUrl = URL(serverName.ensureProtocol())
             val domain = parsedUrl.host ?: error("Invalid server name: $serverName")
@@ -38,6 +40,10 @@ class RustTemporaryMatrixClientFactory(
             )
                 .serverName(formattedServerName)
                 .build()
+            if (!LockedHomeserverPolicy.isAllowed(client.homeserver())) {
+                client.close()
+                error("Resolved homeserver is not allowed by this application")
+            }
             RustTemporaryMatrixClient(client, sessionPaths)
         }
     }

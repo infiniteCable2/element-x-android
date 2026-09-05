@@ -9,6 +9,7 @@
 package io.element.android.libraries.matrix.impl.auth
 
 import com.google.common.truth.Truth.assertThat
+import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.libraries.matrix.impl.FakeClientBuilderProvider
 import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClient
 import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClientBuilder
@@ -20,25 +21,31 @@ class RustHomeserverLoginCompatibilityCheckerTest {
     @Test
     fun `check - is valid if it supports OAuth login`() = runTest {
         val sut = createChecker { FakeFfiHomeserverLoginDetails(supportsOAuthLogin = true) }
-        assertThat(sut.check("https://matrix.host.org").getOrNull()).isTrue()
+        assertThat(sut.check(LockedHomeserverPolicy.configuredHomeserverUrl).getOrNull()).isTrue()
     }
 
     @Test
     fun `check - is valid if it supports password login`() = runTest {
         val sut = createChecker { FakeFfiHomeserverLoginDetails(supportsPasswordLogin = true) }
-        assertThat(sut.check("https://matrix.host.org").getOrNull()).isTrue()
+        assertThat(sut.check(LockedHomeserverPolicy.configuredHomeserverUrl).getOrNull()).isTrue()
     }
 
     @Test
     fun `check - is not valid if it only supports SSO login`() = runTest {
         val sut = createChecker { FakeFfiHomeserverLoginDetails(supportsSsoLogin = true) }
-        assertThat(sut.check("https://matrix.host.org").getOrNull()).isFalse()
+        assertThat(sut.check(LockedHomeserverPolicy.configuredHomeserverUrl).getOrNull()).isFalse()
     }
 
     @Test
     fun `check - is not valid if fetching the data fails`() = runTest {
         val sut = createChecker { error("Unexpected error!") }
-        assertThat(sut.check("https://matrix.host.org").isFailure).isTrue()
+        assertThat(sut.check(LockedHomeserverPolicy.configuredHomeserverUrl).isFailure).isTrue()
+    }
+
+    @Test
+    fun `check rejects another homeserver`() = runTest {
+        val sut = createChecker { FakeFfiHomeserverLoginDetails(supportsOAuthLogin = true) }
+        assertThat(sut.check("https://other.example").isFailure).isTrue()
     }
 
     private fun createChecker(
@@ -46,7 +53,10 @@ class RustHomeserverLoginCompatibilityCheckerTest {
     ) = RustHomeServerLoginCompatibilityChecker(
         clientBuilderProvider = FakeClientBuilderProvider {
             FakeFfiClientBuilder {
-                FakeFfiClient(homeserverLoginDetailsResult = result)
+                FakeFfiClient(
+                    homeserver = LockedHomeserverPolicy.configuredHomeserverUrl,
+                    homeserverLoginDetailsResult = result,
+                )
             }
         },
     )
