@@ -5,7 +5,7 @@ The app reads `update.json` from this directory. It only downloads an APK after 
 To publish an update:
 
 1. Build and sign the APK with the same signing key as the installed app.
-2. Copy the APK to this directory as `enjoy-matrix.apk`.
+2. Copy the APK to this directory as `infinitecable2-matrix.apk`.
 3. Set `versionCode` in `update.json` to the exact version code embedded in that APK and set `versionName` to the displayed version.
 4. Calculate the APK's SHA-256 checksum and replace the `sha256` value.
 5. Commit the APK and manifest together.

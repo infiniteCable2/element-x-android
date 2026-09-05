@@ -26,7 +26,7 @@ class AppUpdateManifestTest {
             ResolvedAppUpdate(
                 versionCode = 43,
                 versionName = "4.3",
-                apkUrl = "https://example.org/release/enjoy-matrix.apk",
+                apkUrl = "https://example.org/release/infinitecable2-matrix.apk",
                 sha256 = A_SHA_256,
             )
         )
@@ -48,7 +48,7 @@ private const val A_SHA_256 = "0123456789abcdef0123456789abcdef0123456789abcdef0
 
 private fun aManifest(
     versionCode: Long = 43,
-    apk: String = "enjoy-matrix.apk",
+    apk: String = "infinitecable2-matrix.apk",
     sha256: String = A_SHA_256,
 ) = AppUpdateManifest(
     versionCode = versionCode,
