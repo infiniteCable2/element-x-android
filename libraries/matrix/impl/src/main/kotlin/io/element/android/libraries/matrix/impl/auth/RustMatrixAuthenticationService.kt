@@ -11,6 +11,7 @@ package io.element.android.libraries.matrix.impl.auth
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import dev.zacsweers.metro.SingleIn
+import io.element.android.appconfig.HomeserverConnectionPolicy
 import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.features.enterprise.api.ClientEnterpriseHook
 import io.element.android.features.enterprise.api.EnterpriseService
@@ -75,6 +76,8 @@ class RustMatrixAuthenticationService(
     private val featureFlagService: FeatureFlagService,
     private val clientEnterpriseHook: ClientEnterpriseHook,
 ) : MatrixAuthenticationService {
+    internal var homeserverConnectionPolicy: HomeserverConnectionPolicy = LockedHomeserverPolicy
+
     // Any existing Element Classic session that we want to try to import secrets from during login.
     private var elementClassicSession: ElementClassicSession? = null
 
@@ -130,12 +133,12 @@ class RustMatrixAuthenticationService(
         withContext(coroutineDispatchers.io) {
             val emptySessionPath = rotateSessionPath()
             runCatchingExceptions {
-                LockedHomeserverPolicy.requireAllowed(homeserver)
+                homeserverConnectionPolicy.requireAllowed(homeserver)
                 val client = makeClient(sessionPaths = emptySessionPath) {
                     serverNameOrHomeserverUrl(homeserver)
                 }
 
-                if (!LockedHomeserverPolicy.isAllowed(client.homeserver())) {
+                if (!homeserverConnectionPolicy.isAllowed(client.homeserver())) {
                     client.close()
                     error("Resolved homeserver is not allowed by this application")
                 }
@@ -445,7 +448,7 @@ class RustMatrixAuthenticationService(
             throw HumanQrLoginException.Unknown()
         }
 
-        LockedHomeserverPolicy.requireAllowed(baseUrlOrServerName)
+        homeserverConnectionPolicy.requireAllowed(baseUrlOrServerName)
 
         val client = rustMatrixClientFactory
             .getBaseClientBuilder(
@@ -456,7 +459,7 @@ class RustMatrixAuthenticationService(
             )
             .serverNameOrHomeserverUrl(baseUrlOrServerName)
             .build()
-        if (!LockedHomeserverPolicy.isAllowed(client.homeserver())) {
+        if (!homeserverConnectionPolicy.isAllowed(client.homeserver())) {
             client.close()
             error("Resolved homeserver is not allowed by this application")
         }

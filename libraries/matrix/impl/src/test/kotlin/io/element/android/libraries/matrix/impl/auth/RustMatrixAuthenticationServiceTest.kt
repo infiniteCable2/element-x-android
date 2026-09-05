@@ -9,12 +9,13 @@
 package io.element.android.libraries.matrix.impl.auth
 
 import com.google.common.truth.Truth.assertThat
-import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.features.enterprise.api.EnterpriseService
 import io.element.android.features.enterprise.test.FakeEnterpriseService
 import io.element.android.libraries.featureflag.test.FakeFeatureFlagService
 import io.element.android.libraries.matrix.impl.ClientBuilderProvider
 import io.element.android.libraries.matrix.impl.FakeClientBuilderProvider
+import io.element.android.libraries.matrix.impl.TEST_HOMESERVER_URL
+import io.element.android.libraries.matrix.impl.TestHomeserverConnectionPolicy
 import io.element.android.libraries.matrix.impl.createRustMatrixClientFactory
 import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClient
 import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClientBuilder
@@ -40,7 +41,7 @@ class RustMatrixAuthenticationServiceTest {
                     FakeFfiClientBuilder(
                         buildResult = {
                             FakeFfiClient(
-                                homeserver = LockedHomeserverPolicy.configuredHomeserverUrl,
+                                homeserver = TEST_HOMESERVER_URL,
                                 homeserverLoginDetailsResult = {
                                     FakeFfiHomeserverLoginDetails()
                                 }
@@ -50,7 +51,7 @@ class RustMatrixAuthenticationServiceTest {
                 }
             ),
         )
-        assertThat(sut.setHomeserver(LockedHomeserverPolicy.configuredHomeserverUrl).isSuccess).isTrue()
+        assertThat(sut.setHomeserver(TEST_HOMESERVER_URL).isSuccess).isTrue()
     }
 
     @Test
@@ -62,7 +63,7 @@ class RustMatrixAuthenticationServiceTest {
                     FakeFfiClientBuilder(
                         buildResult = {
                             FakeFfiClient(
-                                homeserver = LockedHomeserverPolicy.configuredHomeserverUrl,
+                                homeserver = TEST_HOMESERVER_URL,
                                 homeserverLoginDetailsResult = {
                                     throw IllegalStateException("Failed to get homeserver login details")
                                 },
@@ -73,7 +74,7 @@ class RustMatrixAuthenticationServiceTest {
                 },
             ),
         )
-        assertThat(sut.setHomeserver(LockedHomeserverPolicy.configuredHomeserverUrl).isFailure).isTrue()
+        assertThat(sut.setHomeserver(TEST_HOMESERVER_URL).isFailure).isTrue()
         closeResult.assertions().isCalledOnce()
     }
 
@@ -108,6 +109,6 @@ class RustMatrixAuthenticationServiceTest {
             enterpriseService = enterpriseService,
             featureFlagService = FakeFeatureFlagService(),
             clientEnterpriseHook = {},
-        )
+        ).also { it.homeserverConnectionPolicy = TestHomeserverConnectionPolicy }
     }
 }

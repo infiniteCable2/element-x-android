@@ -9,7 +9,6 @@
 package io.element.android.libraries.matrix.impl
 
 import com.google.common.truth.Truth.assertThat
-import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.libraries.featureflag.test.FakeFeatureFlagService
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.impl.auth.FakeProxyProvider
@@ -39,7 +38,7 @@ class RustMatrixClientFactoryTest {
         val workManagerScheduler = FakeWorkManagerScheduler(submitLambda = scheduleVacuumLambda)
         val sut = createRustMatrixClientFactory(workManagerScheduler = workManagerScheduler)
 
-        val result = sut.create(aSessionData().copy(homeserverUrl = LockedHomeserverPolicy.configuredHomeserverUrl))
+        val result = sut.create(aSessionData().copy(homeserverUrl = TEST_HOMESERVER_URL))
 
         assertThat(result.sessionId).isEqualTo(SessionId("@alice:server.org"))
         scheduleVacuumLambda.assertions().isCalledOnce()
@@ -60,7 +59,7 @@ fun TestScope.createRustMatrixClientFactory(
     clientBuilderProvider: ClientBuilderProvider = FakeClientBuilderProvider {
         FakeFfiClientBuilder {
             FakeFfiClient(
-                homeserver = LockedHomeserverPolicy.configuredHomeserverUrl,
+                homeserver = TEST_HOMESERVER_URL,
                 withUtdHook = {},
             )
         }
@@ -81,4 +80,4 @@ fun TestScope.createRustMatrixClientFactory(
     sqliteStoreBuilderProvider = FakeSqliteStoreBuilderProvider(),
     workManagerScheduler = workManagerScheduler,
     clientBuilderEnterpriseHook = { builder, _ -> builder },
-)
+).also { it.homeserverConnectionPolicy = TestHomeserverConnectionPolicy }

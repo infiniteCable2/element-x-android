@@ -10,7 +10,7 @@ package config
 
 object BuildTimeConfig {
     const val APPLICATION_ID = "io.github.infinitecable2.elementx"
-    const val APPLICATION_NAME = "InfiniteCable2 Matrix"
+    const val APPLICATION_NAME = "Element"
     val METADATA_HOST_REVERSED: String? = "io.github.infinitecable2.elementx"
     val OAUTH_CLIENT_URL_PATH: String? = "apps/android"
     val URL_WEBSITE: String? = null

@@ -10,6 +10,7 @@ package io.element.android.libraries.matrix.impl.auth
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
+import io.element.android.appconfig.HomeserverConnectionPolicy
 import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.libraries.core.extensions.runCatchingExceptions
 import io.element.android.libraries.matrix.api.auth.HomeServerLoginCompatibilityChecker
@@ -20,14 +21,16 @@ import timber.log.Timber
 class RustHomeServerLoginCompatibilityChecker(
     private val clientBuilderProvider: ClientBuilderProvider,
     ) : HomeServerLoginCompatibilityChecker {
+    internal var homeserverConnectionPolicy: HomeserverConnectionPolicy = LockedHomeserverPolicy
+
     override suspend fun check(url: String): Result<Boolean> = runCatchingExceptions {
-        LockedHomeserverPolicy.requireAllowed(url)
+        homeserverConnectionPolicy.requireAllowed(url)
         clientBuilderProvider.provide()
             .inMemoryStore()
             .serverNameOrHomeserverUrl(url)
             .build()
             .use {
-                LockedHomeserverPolicy.requireAllowed(it.homeserver())
+                homeserverConnectionPolicy.requireAllowed(it.homeserver())
                 it.homeserverLoginDetails()
             }
             .use {

@@ -59,6 +59,9 @@ class OnBoardingPresenter(
     @Composable
     override fun present(): OnBoardingState {
         val localCoroutineScope = rememberCoroutineScope()
+        val isHomeserverEntryPrivate = remember {
+            enterpriseService.isHomeserverEntryPrivate()
+        }
         val forcedAccountProvider = remember {
             // If homeserverAllowList() returns a singleton list, this is the default account provider.
             // In this case, the user can sign in using this homeserver, or use QrCode login
@@ -72,7 +75,7 @@ class OnBoardingPresenter(
         }
         val linkAccountProvider by produceState<String?>(initialValue = null) {
             // Account provider from the link, if allowed by the enterprise service
-            value = params.accountProvider?.takeIf {
+            value = params.accountProvider?.takeIf { !isHomeserverEntryPrivate }?.takeIf {
                 try {
                     defaultAccountProviderAccessControl.assertIsAllowedToConnectToAccountProvider(it, it)
                     true
@@ -84,7 +87,7 @@ class OnBoardingPresenter(
         val defaultAccountProvider = remember(linkAccountProvider) {
             // If there is a forced account provider, this is the default account provider
             // Else use the account provider passed in the params if any and if allowed
-            forcedAccountProvider ?: linkAccountProvider
+            if (isHomeserverEntryPrivate) null else forcedAccountProvider ?: linkAccountProvider
         }
         val canLoginWithQrCode by produceState(initialValue = false, linkAccountProvider) {
             value = linkAccountProvider == null

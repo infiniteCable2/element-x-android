@@ -8,7 +8,6 @@
 package io.element.android.libraries.matrix.impl
 
 import com.google.common.truth.Truth.assertThat
-import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.libraries.featureflag.test.FakeFeatureFlagService
 import io.element.android.libraries.matrix.impl.auth.FakeProxyProvider
 import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClient
@@ -32,7 +31,7 @@ class RustTemporaryMatrixClientFactoryTest {
     @Test
     fun `create returns a TemporaryMatrixClient`() = runTest {
         val sut = createRustTemporaryMatrixClientFactory()
-        val result = sut.create(LockedHomeserverPolicy.configuredHomeserverUrl)
+        val result = sut.create(TEST_HOMESERVER_URL)
         assertThat(result.isSuccess).isTrue()
     }
 
@@ -52,7 +51,7 @@ class RustTemporaryMatrixClientFactoryTest {
                 )
             )
         )
-        val result = sut.create(LockedHomeserverPolicy.configuredHomeserverUrl)
+        val result = sut.create(TEST_HOMESERVER_URL)
         assertThat(result.isFailure).isTrue()
     }
 
@@ -63,7 +62,7 @@ class RustTemporaryMatrixClientFactoryTest {
         return RustTemporaryMatrixClientFactory(
             sessionPathsFactory = sessionPathsFactory,
             rustMatrixClientFactory = rustMatrixClientFactory,
-        )
+        ).also { it.homeserverConnectionPolicy = TestHomeserverConnectionPolicy }
     }
 
     private fun TestScope.createRustMatrixClientFactory(
@@ -74,7 +73,7 @@ class RustTemporaryMatrixClientFactoryTest {
         clientBuilderProvider: ClientBuilderProvider = FakeClientBuilderProvider {
             FakeFfiClientBuilder {
                 FakeFfiClient(
-                    homeserver = LockedHomeserverPolicy.configuredHomeserverUrl,
+                    homeserver = TEST_HOMESERVER_URL,
                     withUtdHook = {},
                 )
             }
@@ -95,5 +94,5 @@ class RustTemporaryMatrixClientFactoryTest {
         sqliteStoreBuilderProvider = FakeSqliteStoreBuilderProvider(),
         workManagerScheduler = workManagerScheduler,
         clientBuilderEnterpriseHook = { builder, _ -> builder },
-    )
+    ).also { it.homeserverConnectionPolicy = TestHomeserverConnectionPolicy }
 }

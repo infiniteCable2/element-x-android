@@ -43,6 +43,13 @@ interface EnterpriseService {
     fun homeserverAllowList(): List<String>
 
     /**
+     * Whether account-provider URLs must stay out of the onboarding UI and autocomplete history.
+     * The user can still enter a provider manually and [isAllowedToConnectToHomeserver] remains the
+     * authoritative access check.
+     */
+    fun isHomeserverEntryPrivate(): Boolean = false
+
+    /**
      * Whether the user is allowed to sign in to a given homeserver, according to [homeserverAllowList].
      *
      * @param homeserverUrl the server the user is trying to use.

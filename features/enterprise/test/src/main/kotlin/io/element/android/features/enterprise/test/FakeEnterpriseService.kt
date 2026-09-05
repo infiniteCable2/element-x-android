@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 class FakeEnterpriseService(
     private val isEnterpriseUserResult: (SessionId) -> Boolean = { lambdaError() },
     private val defaultHomeserverListResult: () -> List<String> = { emptyList() },
+    private val isHomeserverEntryPrivateResult: () -> Boolean = { false },
     private val isAllowedToConnectToHomeserverResult: (String) -> Boolean = { lambdaError() },
     initialSemanticColors: SemanticColorsLightDark = SemanticColorsLightDark.default,
     initialBrandColor: Color? = null,
@@ -47,6 +48,8 @@ class FakeEnterpriseService(
     override fun homeserverAllowList(): List<String> {
         return defaultHomeserverListResult()
     }
+
+    override fun isHomeserverEntryPrivate(): Boolean = isHomeserverEntryPrivateResult()
 
     override suspend fun isAllowedToConnectToHomeserver(homeserverUrl: String): Boolean = simulateLongTask {
         isAllowedToConnectToHomeserverResult(homeserverUrl)

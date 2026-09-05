@@ -57,22 +57,29 @@ class ConfirmAccountProviderPresenter(
         val loginModeState = loginModePresenter.present()
         val changeServerState = changeServerPresenter.present()
         val homeserverHistory by appPreferencesStore.getHomeserverHistoryFlow().collectAsState(emptyList())
+        val isHomeserverEntryPrivate = remember {
+            enterpriseService.isHomeserverEntryPrivate()
+        }
 
         // The account providers offered for autocomplete: previously-used ones first, then the
         // enterprise/MDM-configured allow-list, then matrix.org (always available, even before any sign-in).
         // The "*" wildcard is a routing marker, not a real provider, so it is filtered out. Everything is
         // rendered without the https:// scheme (added back at connection time).
-        val autocompleteCandidates = remember(homeserverHistory) {
-            (homeserverHistory + enterpriseService.homeserverAllowList() + AuthenticationConfig.MATRIX_ORG_URL)
-                .filter { it != EnterpriseService.ANY_ACCOUNT_PROVIDER }
-                .map { it.withoutScheme() }
-                .distinct()
+        val autocompleteCandidates = remember(homeserverHistory, isHomeserverEntryPrivate) {
+            if (isHomeserverEntryPrivate) {
+                emptyList()
+            } else {
+                (homeserverHistory + enterpriseService.homeserverAllowList() + AuthenticationConfig.MATRIX_ORG_URL)
+                    .filter { it != EnterpriseService.ANY_ACCOUNT_PROVIDER }
+                    .map { it.withoutScheme() }
+                    .distinct()
+            }
         }
 
         // Editable input, seeded from the current (history-defaulted) account provider until the user edits it.
         // Displayed without the scheme, so the field shows e.g. "matrix.org" rather than "https://matrix.org".
         var userInput by rememberSaveable { mutableStateOf<String?>(null) }
-        val accountProviderInput = userInput ?: accountProvider.url.withoutScheme()
+        val accountProviderInput = userInput ?: if (isHomeserverEntryPrivate) "" else accountProvider.url.withoutScheme()
 
         // Offer the first candidate that the current input is a (case-insensitive) prefix of.
         val accountProviderSuggestion = remember(accountProviderInput, autocompleteCandidates) {

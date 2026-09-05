@@ -57,6 +57,26 @@ class ConfirmAccountProviderPresenterTest {
     }
 
     @Test
+    fun `present - private homeserver entry starts empty and never autocompletes`() = runTest {
+        val presenter = createConfirmAccountProviderPresenter(
+            appPreferencesStore = InMemoryAppPreferencesStore(
+                homeserverHistory = listOf("https://previous.example.org"),
+            ),
+            enterpriseService = FakeEnterpriseService(
+                isHomeserverEntryPrivateResult = { true },
+            ),
+        )
+        presenter.test {
+            val initialState = awaitItem()
+            assertThat(initialState.accountProviderInput).isEmpty()
+            assertThat(initialState.submitEnabled).isFalse()
+            initialState.eventSink(ConfirmAccountProviderEvent.UserInputChanged("pre"))
+            val editedState = awaitState { it.accountProviderInput == "pre" }
+            assertThat(editedState.accountProviderSuggestion).isNull()
+        }
+    }
+
+    @Test
     fun `present - continue password login`() = runTest {
         val authenticationService = FakeMatrixAuthenticationService(
             setHomeserverResult = {

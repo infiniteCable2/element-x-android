@@ -9,43 +9,48 @@ package io.element.android.appconfig
 
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
+import java.security.MessageDigest
 
 class LockedHomeserverPolicyTest {
+    private val expectedDigest = MessageDigest.getInstance("SHA-256")
+        .digest(ALLOWED_HOST.toByteArray(Charsets.UTF_8))
+
     @Test
     fun `configured homeserver is allowed`() {
-        assertThat(LockedHomeserverPolicy.isAllowed(LockedHomeserverPolicy.configuredHomeserverUrl)).isTrue()
+        assertThat(isAllowed("https://$ALLOWED_HOST")).isTrue()
     }
 
     @Test
     fun `port and path do not affect the host lock`() {
-        val host = LockedHomeserverPolicy.normalizedHttpsHost(LockedHomeserverPolicy.configuredHomeserverUrl)
-        assertThat(LockedHomeserverPolicy.isAllowed("https://$host:8448/matrix/client")).isTrue()
+        assertThat(isAllowed("https://$ALLOWED_HOST:8448/matrix/client")).isTrue()
     }
 
     @Test
     fun `missing scheme is treated as https`() {
-        val host = LockedHomeserverPolicy.normalizedHttpsHost(LockedHomeserverPolicy.configuredHomeserverUrl)
-        assertThat(LockedHomeserverPolicy.isAllowed(host.orEmpty())).isTrue()
+        assertThat(isAllowed(ALLOWED_HOST)).isTrue()
     }
 
     @Test
     fun `http is rejected`() {
-        val host = LockedHomeserverPolicy.normalizedHttpsHost(LockedHomeserverPolicy.configuredHomeserverUrl)
-        assertThat(LockedHomeserverPolicy.isAllowed("http://$host")).isFalse()
+        assertThat(isAllowed("http://$ALLOWED_HOST")).isFalse()
     }
 
     @Test
     fun `subdomains and suffix attacks are rejected`() {
-        val host = LockedHomeserverPolicy.normalizedHttpsHost(LockedHomeserverPolicy.configuredHomeserverUrl)
-        assertThat(LockedHomeserverPolicy.isAllowed("https://sub.$host")).isFalse()
-        assertThat(LockedHomeserverPolicy.isAllowed("https://$host.example.org")).isFalse()
+        assertThat(isAllowed("https://sub.$ALLOWED_HOST")).isFalse()
+        assertThat(isAllowed("https://$ALLOWED_HOST.example.org")).isFalse()
     }
 
     @Test
     fun `userinfo query and fragment are rejected`() {
-        val host = LockedHomeserverPolicy.normalizedHttpsHost(LockedHomeserverPolicy.configuredHomeserverUrl)
-        assertThat(LockedHomeserverPolicy.isAllowed("https://user@$host")).isFalse()
-        assertThat(LockedHomeserverPolicy.isAllowed("https://$host?server=other.example")).isFalse()
-        assertThat(LockedHomeserverPolicy.isAllowed("https://$host#other.example")).isFalse()
+        assertThat(isAllowed("https://user@$ALLOWED_HOST")).isFalse()
+        assertThat(isAllowed("https://$ALLOWED_HOST?server=other.example")).isFalse()
+        assertThat(isAllowed("https://$ALLOWED_HOST#other.example")).isFalse()
+    }
+
+    private fun isAllowed(value: String): Boolean = LockedHomeserverPolicy.isAllowed(value, expectedDigest)
+
+    companion object {
+        private const val ALLOWED_HOST = "allowed.example"
     }
 }

@@ -9,6 +9,7 @@
 package io.element.android.libraries.matrix.impl
 
 import dev.zacsweers.metro.Inject
+import io.element.android.appconfig.HomeserverConnectionPolicy
 import io.element.android.appconfig.LockedHomeserverPolicy
 import io.element.android.features.enterprise.api.ClientBuilderEnterpriseHook
 import io.element.android.libraries.androidutils.crypto.ClientSecret
@@ -72,6 +73,8 @@ class RustMatrixClientFactory(
     private val workManagerScheduler: WorkManagerScheduler,
     private val clientBuilderEnterpriseHook: ClientBuilderEnterpriseHook,
 ) {
+    internal var homeserverConnectionPolicy: HomeserverConnectionPolicy = LockedHomeserverPolicy
+
     private val sessionDelegate = RustClientSessionDelegate(
         sessionStore = sessionStore,
         appCoroutineScope = appCoroutineScope,
@@ -79,7 +82,7 @@ class RustMatrixClientFactory(
     )
 
     suspend fun create(sessionData: SessionData): RustMatrixClient = withContext(coroutineDispatchers.io) {
-        LockedHomeserverPolicy.requireAllowed(sessionData.homeserverUrl)
+        homeserverConnectionPolicy.requireAllowed(sessionData.homeserverUrl)
         // This secret is called 'passphrase' for historical reasons, but it can be a raw key or an actual passphrase
         val clientSecret = sessionData.passphrase?.let(ClientSecret::fromString)
         val sessionPaths = sessionData.getSessionPaths()
@@ -104,7 +107,7 @@ class RustMatrixClientFactory(
             .let { (clientBuilderEnterpriseHook(RustMatrixClientBuilder(it), SessionId(sessionData.userId)) as RustMatrixClientBuilder).inner }
             .use { it.build() }
 
-        if (!LockedHomeserverPolicy.isAllowed(client.homeserver())) {
+        if (!homeserverConnectionPolicy.isAllowed(client.homeserver())) {
             client.close()
             error("Resolved homeserver is not allowed by this application")
         }
