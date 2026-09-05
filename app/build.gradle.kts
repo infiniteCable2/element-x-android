@@ -278,6 +278,7 @@ dependencies {
     implementation(projects.features.migration.api)
     implementation(projects.appnav)
     implementation(projects.appconfig)
+    implementation(projects.libraries.appupdater.impl)
     implementation(projects.libraries.uiStrings)
     implementation(projects.services.analytics.compose)
 

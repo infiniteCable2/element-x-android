@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.v2.runAndroidComposeUiTest
 import io.element.android.features.preferences.impl.R
+import io.element.android.libraries.appupdater.api.AppUpdateState
 import io.element.android.libraries.emoji.api.picker.NoOpEmojiPickerRenderer
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.test.A_USER_ID_2
@@ -263,6 +264,21 @@ class PreferencesRootViewTest : RobolectricTest() {
     }
 
     @Test
+    fun `click on app update emits the expected event`() = runAndroidComposeUiTest {
+        val eventsRecorder = EventsRecorder<PreferencesRootEvent>()
+        setView(
+            aPreferencesRootState(
+                appUpdateState = AppUpdateState.Available("2.0"),
+                eventSink = eventsRecorder,
+            ),
+        )
+
+        clickOn(CommonStrings.screen_preferences_app_update)
+
+        eventsRecorder.assertSingle(PreferencesRootEvent.OnAppUpdateClick)
+    }
+
+    @Test
     fun `click on About invokes the expected callback`() = runAndroidComposeUiTest {
         val eventsRecorder = EventsRecorder<PreferencesRootEvent>(expectEvents = false)
         ensureCalledOnce { callback ->
@@ -272,7 +288,8 @@ class PreferencesRootViewTest : RobolectricTest() {
                 ),
                 onOpenAbout = callback,
             )
-            clickOn(CommonStrings.common_about)
+            val text = activity!!.getString(CommonStrings.common_about)
+            onNode(hasText(text) and hasClickAction()).performScrollTo().performClick()
         }
     }
 
@@ -329,7 +346,8 @@ class PreferencesRootViewTest : RobolectricTest() {
                 ),
                 onOpenLabs = callback,
             )
-            clickOn(R.string.screen_labs_title)
+            val text = activity!!.getString(R.string.screen_labs_title)
+            onNode(hasText(text) and hasClickAction()).performScrollTo().performClick()
         }
     }
 

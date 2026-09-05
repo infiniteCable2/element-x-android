@@ -24,6 +24,8 @@ import io.element.android.features.logout.api.direct.DirectLogoutState
 import io.element.android.features.preferences.impl.userstatus.UserStatusState
 import io.element.android.features.preferences.impl.utils.ShowDeveloperSettingsProvider
 import io.element.android.features.rageshake.api.RageshakeFeatureAvailability
+import io.element.android.libraries.appupdater.api.AppUpdateState
+import io.element.android.libraries.appupdater.api.AppUpdater
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
 import io.element.android.libraries.designsystem.utils.snackbar.collectSnackbarMessageAsState
@@ -59,6 +61,7 @@ class PreferencesRootPresenter(
     private val sessionStore: SessionStore,
     private val sessionEnterpriseService: SessionEnterpriseService,
     private val userStatusPresenter: Presenter<UserStatusState>,
+    private val appUpdater: AppUpdater,
 ) : Presenter<PreferencesRootState> {
     @Composable
     override fun present(): PreferencesRootState {
@@ -123,6 +126,13 @@ class PreferencesRootPresenter(
         val showLabsItem = remember { featureFlagService.getAvailableFeatures(isInLabs = true).isNotEmpty() }
 
         val directLogoutState = directLogoutPresenter.present()
+        val appUpdateState by appUpdater.state.collectAsState()
+
+        LaunchedEffect(Unit) {
+            if (appUpdater.state.value == AppUpdateState.Idle) {
+                appUpdater.checkForUpdate()
+            }
+        }
 
         LaunchedEffect(Unit) {
             initAccountManagementUrl(accountManagementUrl)
@@ -135,6 +145,22 @@ class PreferencesRootPresenter(
                 is PreferencesRootEvent.OnVersionInfoClick -> {
                     showDeveloperSettingsProvider.unlockDeveloperSettings(coroutineScope)
                 }
+                PreferencesRootEvent.OnAppUpdateClick -> when (appUpdateState) {
+                    is AppUpdateState.Available -> coroutineScope.launch {
+                        appUpdater.downloadUpdate()
+                        if (appUpdater.state.value is AppUpdateState.ReadyToInstall) {
+                            appUpdater.installDownloadedUpdate()
+                        }
+                    }
+                    is AppUpdateState.ReadyToInstall -> appUpdater.installDownloadedUpdate()
+                    AppUpdateState.Idle,
+                    AppUpdateState.UpToDate,
+                    AppUpdateState.Failed -> coroutineScope.launch {
+                        appUpdater.checkForUpdate()
+                    }
+                    AppUpdateState.Checking,
+                    is AppUpdateState.Downloading -> Unit
+                }
                 is PreferencesRootEvent.SwitchToSession -> coroutineScope.launch {
                     sessionStore.setLatestSession(event.sessionId.value)
                 }
@@ -145,6 +171,7 @@ class PreferencesRootPresenter(
             myUser = matrixUser.value,
             userStatusState = userStatusState,
             version = remember { versionFormatter.get() },
+            appUpdateState = appUpdateState,
             isMultiAccountEnabled = isMultiAccountEnabled,
             otherSessions = otherSessions,
             showSecureBackup = !canVerifyUserSession,

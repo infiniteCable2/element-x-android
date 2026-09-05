@@ -49,6 +49,7 @@ setupDependencyInjection()
 dependencies {
     implementation(projects.libraries.androidutils)
     implementation(projects.appconfig)
+    implementation(projects.libraries.appupdater.api)
     implementation(projects.libraries.core)
     implementation(projects.libraries.architecture)
     implementation(projects.libraries.cachestore.api)
@@ -100,6 +101,7 @@ dependencies {
     implementation(libs.network.okhttp)
 
     testCommonDependencies(libs, true)
+    testImplementation(projects.libraries.appupdater.test)
     testImplementation(projects.libraries.matrix.test)
     testImplementation(projects.libraries.emoji.test)
     testImplementation(projects.libraries.featureflag.test)

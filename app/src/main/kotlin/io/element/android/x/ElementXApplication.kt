@@ -15,6 +15,7 @@ import androidx.startup.AppInitializer
 import androidx.work.Configuration
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.createGraphFactory
+import io.element.android.libraries.appupdater.api.AppUpdater
 import io.element.android.libraries.architecture.bindings
 import io.element.android.libraries.di.DependencyInjectionGraphOwner
 import io.element.android.libraries.matrix.api.SdkMetadata
@@ -34,6 +35,7 @@ class ElementXApplication : Application(), DependencyInjectionGraphOwner, Config
         .build()
 
     @Inject lateinit var sdkMetadata: SdkMetadata
+    @Inject lateinit var appUpdater: AppUpdater
 
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate() {
@@ -46,6 +48,7 @@ class ElementXApplication : Application(), DependencyInjectionGraphOwner, Config
 
         bindings<ApplicationBindings>().inject(this)
         logApplicationInfo(this, sdkMetadata.sdkGitSha)
+        appUpdater.checkInBackground()
 
         // Disable the strict offset check for anchored draggable components, as it can cause issues with bottom sheets.
         // Remove once https://issuetracker.google.com/issues/477038695 is fixed.

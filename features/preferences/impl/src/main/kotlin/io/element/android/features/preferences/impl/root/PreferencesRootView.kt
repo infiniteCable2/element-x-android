@@ -29,6 +29,7 @@ import io.element.android.features.preferences.impl.R
 import io.element.android.features.preferences.impl.user.UserPreferences
 import io.element.android.features.preferences.impl.userstatus.UserStatusState
 import io.element.android.features.preferences.impl.userstatus.UserStatusView
+import io.element.android.libraries.appupdater.api.AppUpdateState
 import io.element.android.libraries.architecture.AsyncAction
 import io.element.android.libraries.architecture.coverage.ExcludeFromCoverage
 import io.element.android.libraries.designsystem.components.async.AsyncActionIndicator
@@ -233,6 +234,15 @@ private fun ColumnScope.ManageAppSection(
         leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Lock())),
         onClick = onOpenLockScreenSettings,
     )
+    ListItem(
+        content = { Text(stringResource(CommonStrings.screen_preferences_app_update)) },
+        supportingContent = { Text(appUpdateSupportingText(state.appUpdateState)) },
+        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Download())),
+        trailingContent = ListItemContent.Badge.takeIf {
+            state.appUpdateState is AppUpdateState.Available || state.appUpdateState is AppUpdateState.ReadyToInstall
+        },
+        onClick = { state.eventSink(PreferencesRootEvent.OnAppUpdateClick) },
+    )
     if (state.showSecureBackup) {
         ListItem(
             content = { Text(stringResource(id = CommonStrings.common_encryption)) },
@@ -242,6 +252,17 @@ private fun ColumnScope.ManageAppSection(
         )
     }
     HorizontalDivider()
+}
+
+@Composable
+private fun appUpdateSupportingText(state: AppUpdateState): String = when (state) {
+    AppUpdateState.Idle -> stringResource(CommonStrings.screen_preferences_app_update_check)
+    AppUpdateState.Checking -> stringResource(CommonStrings.screen_preferences_app_update_checking)
+    AppUpdateState.UpToDate -> stringResource(CommonStrings.screen_preferences_app_update_up_to_date)
+    is AppUpdateState.Available -> stringResource(CommonStrings.screen_preferences_app_update_available, state.versionName)
+    is AppUpdateState.Downloading -> stringResource(CommonStrings.screen_preferences_app_update_downloading, state.versionName)
+    is AppUpdateState.ReadyToInstall -> stringResource(CommonStrings.screen_preferences_app_update_ready, state.versionName)
+    AppUpdateState.Failed -> stringResource(CommonStrings.screen_preferences_app_update_failed)
 }
 
 @Composable

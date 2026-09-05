@@ -19,6 +19,10 @@ interface IndicatorService {
     @Composable
     fun showRoomListTopBarIndicator(): State<Boolean>
 
+    /** Whether to show the update icon on the room list avatar. */
+    @Composable
+    fun showAppUpdateIndicator(): State<Boolean>
+
     /** Whether to show the red dot on the chat backup setting, i.e. when recovery needs the user's attention. */
     @Composable
     fun showSettingChatBackupIndicator(): State<Boolean>

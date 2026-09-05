@@ -18,6 +18,9 @@ import io.element.android.features.logout.api.direct.aDirectLogoutState
 import io.element.android.features.preferences.impl.userstatus.aUserStatusState
 import io.element.android.features.preferences.impl.utils.ShowDeveloperSettingsProvider
 import io.element.android.features.rageshake.api.RageshakeFeatureAvailability
+import io.element.android.libraries.appupdater.api.AppUpdateState
+import io.element.android.libraries.appupdater.api.AppUpdater
+import io.element.android.libraries.appupdater.test.FakeAppUpdater
 import io.element.android.libraries.core.meta.BuildType
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
 import io.element.android.libraries.featureflag.api.FeatureFlagService
@@ -160,6 +163,25 @@ class PreferencesRootPresenterTest {
             indicatorService.setShowSettingChatBackupIndicator(true)
             val finalState = awaitItem()
             assertThat(finalState.showSecureBackupBadge).isTrue()
+        }
+    }
+
+    @Test
+    fun `present - app update is exposed and downloaded after a click`() = runTest {
+        val appUpdater = FakeAppUpdater(AppUpdateState.Available("2.0"))
+        createPresenter(
+            matrixClient = FakeMatrixClient(
+                canDeactivateAccountResult = { true },
+                accountManagementUrlResult = { Result.success(null) },
+            ),
+            appUpdater = appUpdater,
+        ).test {
+            val state = awaitItem()
+            assertThat(state.appUpdateState).isEqualTo(AppUpdateState.Available("2.0"))
+            state.eventSink(PreferencesRootEvent.OnAppUpdateClick)
+            testScheduler.advanceUntilIdle()
+            assertThat(appUpdater.downloadCount).isEqualTo(1)
+            cancelAndIgnoreRemainingEvents()
         }
     }
 
@@ -334,6 +356,7 @@ class PreferencesRootPresenterTest {
         featureFlagService: FeatureFlagService = FakeFeatureFlagService(),
         sessionStore: SessionStore = InMemorySessionStore(),
         sessionEnterpriseService: SessionEnterpriseService = FakeSessionEnterpriseService(),
+        appUpdater: AppUpdater = FakeAppUpdater(),
     ) = PreferencesRootPresenter(
         matrixClient = matrixClient,
         sessionVerificationService = sessionVerificationService,
@@ -348,5 +371,6 @@ class PreferencesRootPresenterTest {
         sessionStore = sessionStore,
         sessionEnterpriseService = sessionEnterpriseService,
         userStatusPresenter = { aUserStatusState() },
+        appUpdater = appUpdater,
     )
 }

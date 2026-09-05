@@ -75,6 +75,7 @@ class HomePresenter(
         }
         // Avatar indicator
         val showAvatarIndicator by indicatorService.showRoomListTopBarIndicator()
+        val showAppUpdateIndicator by indicatorService.showAppUpdateIndicator()
         val directLogoutState = logoutPresenter.present()
 
         fun handleEvent(event: HomeEvent) {
@@ -92,6 +93,7 @@ class HomePresenter(
         return HomeState(
             currentUserAndNeighbors = currentUserAndNeighbors,
             showAvatarIndicator = showAvatarIndicator,
+            showAppUpdateIndicator = showAppUpdateIndicator,
             hasNetworkConnection = isOnline,
             currentHomeNavigationBarItem = currentHomeNavigationBarItem,
             roomListState = roomListState,

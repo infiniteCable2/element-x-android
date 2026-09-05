@@ -20,6 +20,7 @@ android {
 }
 
 dependencies {
+    implementation(projects.libraries.appupdater.api)
     implementation(projects.libraries.di)
     implementation(projects.libraries.featureflag.api)
     implementation(projects.libraries.matrix.api)
@@ -29,6 +30,7 @@ dependencies {
     api(projects.libraries.indicator.api)
 
     testCommonDependencies(libs)
+    testImplementation(projects.libraries.appupdater.test)
     testImplementation(projects.libraries.featureflag.test)
     testImplementation(projects.libraries.matrix.test)
 }

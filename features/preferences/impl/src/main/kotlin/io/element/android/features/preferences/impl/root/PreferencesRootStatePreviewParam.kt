@@ -14,6 +14,7 @@ import io.element.android.features.logout.api.direct.aDirectLogoutState
 import io.element.android.features.preferences.impl.userstatus.UserStatusPickerState
 import io.element.android.features.preferences.impl.userstatus.UserStatusState
 import io.element.android.features.preferences.impl.userstatus.aUserStatusState
+import io.element.android.libraries.appupdater.api.AppUpdateState
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.ui.components.aMatrixUser
@@ -53,6 +54,7 @@ open class PreferencesRootStatePreviewParam : PreviewParameterProvider<Preferenc
                 showSecureBackupBadge = true,
             ),
             aPreferencesRootState(
+                appUpdateState = AppUpdateState.Available("2.0"),
                 showLabsItem = true,
                 canReportBug = true,
                 nbOfBlockedUsers = 3,
@@ -73,6 +75,7 @@ open class PreferencesRootStatePreviewParam : PreviewParameterProvider<Preferenc
 fun aPreferencesRootState(
     myUser: MatrixUser = aMatrixUser(),
     version: String = "Version 1.1 (1)",
+    appUpdateState: AppUpdateState = AppUpdateState.UpToDate,
     isMultiAccountEnabled: Boolean = false,
     otherSessions: List<MatrixUser> = emptyList(),
     showSecureBackup: Boolean = false,
@@ -92,6 +95,7 @@ fun aPreferencesRootState(
 ) = PreferencesRootState(
     myUser = myUser,
     version = version,
+    appUpdateState = appUpdateState,
     isMultiAccountEnabled = isMultiAccountEnabled,
     otherSessions = otherSessions.toImmutableList(),
     showSecureBackup = showSecureBackup,

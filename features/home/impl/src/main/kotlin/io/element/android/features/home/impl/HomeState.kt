@@ -23,6 +23,7 @@ data class HomeState(
      */
     val currentUserAndNeighbors: ImmutableList<MatrixUser>,
     val showAvatarIndicator: Boolean,
+    val showAppUpdateIndicator: Boolean,
     val hasNetworkConnection: Boolean,
     val currentHomeNavigationBarItem: HomeNavigationBarItem,
     val roomListState: RoomListState,

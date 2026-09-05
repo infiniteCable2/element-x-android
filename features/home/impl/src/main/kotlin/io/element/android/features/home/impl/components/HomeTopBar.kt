@@ -8,6 +8,8 @@
 
 package io.element.android.features.home.impl.components
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -25,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.TopAppBarDefaults
@@ -44,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
@@ -106,6 +110,7 @@ fun HomeTopBar(
     selectedNavigationItem: HomeNavigationBarItem,
     currentUserAndNeighbors: ImmutableList<MatrixUser>,
     showAvatarIndicator: Boolean,
+    showAppUpdateIndicator: Boolean = false,
     areSearchResultsDisplayed: Boolean,
     onToggleSearch: () -> Unit,
     onMenuActionClick: (RoomListMenuAction) -> Unit,
@@ -159,6 +164,7 @@ fun HomeTopBar(
                 NavigationIcon(
                     currentUserAndNeighbors = currentUserAndNeighbors,
                     showAvatarIndicator = showAvatarIndicator,
+                    showAppUpdateIndicator = showAppUpdateIndicator,
                     onAccountSwitch = onAccountSwitch,
                     onClick = onOpenSettings,
                 )
@@ -295,6 +301,7 @@ private fun SpaceFilterButton(
 private fun NavigationIcon(
     currentUserAndNeighbors: ImmutableList<MatrixUser>,
     showAvatarIndicator: Boolean,
+    showAppUpdateIndicator: Boolean,
     onAccountSwitch: (SessionId) -> Unit,
     onClick: () -> Unit,
 ) {
@@ -303,6 +310,7 @@ private fun NavigationIcon(
             matrixUser = currentUserAndNeighbors.single(),
             isCurrentAccount = true,
             showAvatarIndicator = showAvatarIndicator,
+            showAppUpdateIndicator = showAppUpdateIndicator,
             onClick = onClick,
         )
     } else {
@@ -323,6 +331,7 @@ private fun NavigationIcon(
                 matrixUser = currentUserAndNeighbors[page],
                 isCurrentAccount = page == 1,
                 showAvatarIndicator = page == 1 && showAvatarIndicator,
+                showAppUpdateIndicator = page == 1 && showAppUpdateIndicator,
                 onClick = if (page == 1) {
                     onClick
                 } else {
@@ -338,6 +347,7 @@ private fun AccountIcon(
     matrixUser: MatrixUser,
     isCurrentAccount: Boolean,
     showAvatarIndicator: Boolean,
+    showAppUpdateIndicator: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -388,11 +398,35 @@ private fun AccountIcon(
                 modifier = Modifier.align(Alignment.BottomEnd),
             )
         }
-        if (showAvatarIndicator) {
+        if (showAppUpdateIndicator) {
+            AppUpdateIndicator(
+                modifier = Modifier.align(Alignment.TopEnd)
+            )
+        } else if (showAvatarIndicator) {
             RedIndicatorAtom(
                 modifier = Modifier.align(Alignment.TopEnd)
             )
         }
+    }
+}
+
+@Composable
+private fun AppUpdateIndicator(modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(18.dp)
+            .border(1.dp, ElementTheme.colors.bgCanvasDefault, CircleShape)
+            .padding(1.dp)
+            .clip(CircleShape)
+            .background(ElementTheme.colors.bgAccentRest)
+            .padding(3.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = CompoundIcons.Download(),
+            contentDescription = null,
+            tint = ElementTheme.colors.iconOnSolidPrimary,
+        )
     }
 }
 

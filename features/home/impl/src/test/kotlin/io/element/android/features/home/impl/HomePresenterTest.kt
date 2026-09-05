@@ -104,9 +104,12 @@ class HomePresenterTest {
         presenter.test {
             val initialState = awaitItem()
             assertThat(initialState.showAvatarIndicator).isFalse()
+            assertThat(initialState.showAppUpdateIndicator).isFalse()
             indicatorService.setShowRoomListTopBarIndicator(true)
             val finalState = awaitItem()
             assertThat(finalState.showAvatarIndicator).isTrue()
+            indicatorService.setShowAppUpdateIndicator(true)
+            assertThat(awaitItem().showAppUpdateIndicator).isTrue()
         }
     }
 

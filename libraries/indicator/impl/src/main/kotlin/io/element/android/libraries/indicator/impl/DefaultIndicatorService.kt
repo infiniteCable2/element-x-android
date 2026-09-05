@@ -18,6 +18,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import dev.zacsweers.metro.ContributesBinding
+import io.element.android.libraries.appupdater.api.AppUpdateState
+import io.element.android.libraries.appupdater.api.AppUpdater
 import io.element.android.libraries.di.SessionScope
 import io.element.android.libraries.indicator.api.IndicatorService
 import io.element.android.libraries.matrix.api.encryption.BackupState
@@ -29,15 +31,27 @@ import io.element.android.libraries.matrix.api.verification.SessionVerificationS
 class DefaultIndicatorService(
     private val sessionVerificationService: SessionVerificationService,
     private val encryptionService: EncryptionService,
+    private val appUpdater: AppUpdater,
 ) : IndicatorService {
     @Composable
     override fun showRoomListTopBarIndicator(): State<Boolean> {
         val canVerifySession by sessionVerificationService.needsSessionVerification.collectAsState(initial = false)
         val settingChatBackupIndicator = showSettingChatBackupIndicator()
+        val appUpdateIndicator = showAppUpdateIndicator()
 
         return remember {
             derivedStateOf {
-                canVerifySession || settingChatBackupIndicator.value
+                canVerifySession || settingChatBackupIndicator.value || appUpdateIndicator.value
+            }
+        }
+    }
+
+    @Composable
+    override fun showAppUpdateIndicator(): State<Boolean> {
+        val appUpdateState by appUpdater.state.collectAsState()
+        return remember {
+            derivedStateOf {
+                appUpdateState is AppUpdateState.Available || appUpdateState is AppUpdateState.ReadyToInstall
             }
         }
     }

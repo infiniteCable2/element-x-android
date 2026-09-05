@@ -28,6 +28,7 @@ open class HomeStatePreviewParam : PreviewParameterProvider<HomeState> {
     override val values: Sequence<HomeState>
         get() = sequenceOf(
             aHomeState(),
+            aHomeState(showAvatarIndicator = true, showAppUpdateIndicator = true),
             aHomeState(hasNetworkConnection = false),
             aHomeState(snackbarMessage = SnackbarMessage(CommonStrings.common_verification_complete)),
             aHomeState(
@@ -57,6 +58,7 @@ internal fun aHomeState(
     matrixUser: MatrixUser = MatrixUser(userId = UserId("@id:domain"), displayName = "User#1"),
     currentUserAndNeighbors: List<MatrixUser> = listOf(matrixUser),
     showAvatarIndicator: Boolean = false,
+    showAppUpdateIndicator: Boolean = false,
     hasNetworkConnection: Boolean = true,
     snackbarMessage: SnackbarMessage? = null,
     currentHomeNavigationBarItem: HomeNavigationBarItem = HomeNavigationBarItem.Chats,
@@ -68,6 +70,7 @@ internal fun aHomeState(
 ) = HomeState(
     currentUserAndNeighbors = currentUserAndNeighbors.toImmutableList(),
     showAvatarIndicator = showAvatarIndicator,
+    showAppUpdateIndicator = showAppUpdateIndicator,
     hasNetworkConnection = hasNetworkConnection,
     snackbarMessage = snackbarMessage,
     canReportBug = canReportBug,

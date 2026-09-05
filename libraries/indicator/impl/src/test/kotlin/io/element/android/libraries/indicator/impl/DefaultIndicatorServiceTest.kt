@@ -12,6 +12,8 @@ import app.cash.molecule.RecompositionMode
 import app.cash.molecule.moleculeFlow
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import io.element.android.libraries.appupdater.api.AppUpdateState
+import io.element.android.libraries.appupdater.test.FakeAppUpdater
 import io.element.android.libraries.matrix.api.encryption.BackupState
 import io.element.android.libraries.matrix.api.encryption.RecoveryState
 import io.element.android.libraries.matrix.test.encryption.FakeEncryptionService
@@ -27,6 +29,7 @@ class DefaultIndicatorServiceTest {
         val sut = DefaultIndicatorService(
             sessionVerificationService = sessionVerificationService,
             encryptionService = encryptionService,
+            appUpdater = FakeAppUpdater(),
         )
         moleculeFlow(RecompositionMode.Immediate) {
             sut.showRoomListTopBarIndicator().value
@@ -50,6 +53,7 @@ class DefaultIndicatorServiceTest {
         val sut = DefaultIndicatorService(
             sessionVerificationService = sessionVerificationService,
             encryptionService = encryptionService,
+            appUpdater = FakeAppUpdater(),
         )
         moleculeFlow(RecompositionMode.Immediate) {
             sut.showSettingChatBackupIndicator().value
@@ -72,6 +76,7 @@ class DefaultIndicatorServiceTest {
         val sut = DefaultIndicatorService(
             sessionVerificationService = sessionVerificationService,
             encryptionService = encryptionService,
+            appUpdater = FakeAppUpdater(),
         )
         moleculeFlow(RecompositionMode.Immediate) {
             sut.showSettingChatBackupIndicator().value
@@ -88,6 +93,7 @@ class DefaultIndicatorServiceTest {
         val sut = DefaultIndicatorService(
             sessionVerificationService = sessionVerificationService,
             encryptionService = encryptionService,
+            appUpdater = FakeAppUpdater(),
         )
         moleculeFlow(RecompositionMode.Immediate) {
             sut.showSettingChatBackupIndicator().value
@@ -108,6 +114,7 @@ class DefaultIndicatorServiceTest {
         val sut = DefaultIndicatorService(
             sessionVerificationService = sessionVerificationService,
             encryptionService = encryptionService,
+            appUpdater = FakeAppUpdater(),
         )
         moleculeFlow(RecompositionMode.Immediate) {
             sut.showSettingChatBackupIndicator().value
@@ -117,6 +124,27 @@ class DefaultIndicatorServiceTest {
             encryptionService.emitRecoveryState(RecoveryState.ENABLED)
             assertThat(awaitItem()).isFalse()
             encryptionService.emitRecoveryState(RecoveryState.INCOMPLETE)
+            assertThat(awaitItem()).isTrue()
+        }
+    }
+
+    @Test
+    fun `test - app update indicator is visible only when an update needs attention`() = runTest {
+        val appUpdater = FakeAppUpdater()
+        val sut = DefaultIndicatorService(
+            sessionVerificationService = FakeSessionVerificationService(),
+            encryptionService = FakeEncryptionService(),
+            appUpdater = appUpdater,
+        )
+        moleculeFlow(RecompositionMode.Immediate) {
+            sut.showAppUpdateIndicator().value
+        }.test {
+            assertThat(awaitItem()).isFalse()
+            appUpdater.emit(AppUpdateState.Available("2.0"))
+            assertThat(awaitItem()).isTrue()
+            appUpdater.emit(AppUpdateState.Downloading("2.0"))
+            assertThat(awaitItem()).isFalse()
+            appUpdater.emit(AppUpdateState.ReadyToInstall("2.0"))
             assertThat(awaitItem()).isTrue()
         }
     }

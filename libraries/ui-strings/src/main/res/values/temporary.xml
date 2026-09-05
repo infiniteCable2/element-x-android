@@ -10,4 +10,12 @@
     <string name="a11y_state_collapsed">"Collapsed"</string>
     <string name="a11y_active">Active</string>
     <string name="a11y_inactive">Inactive</string>
+    <string name="screen_preferences_app_update">App update</string>
+    <string name="screen_preferences_app_update_check">Tap to check for updates</string>
+    <string name="screen_preferences_app_update_checking">Checking for updates…</string>
+    <string name="screen_preferences_app_update_up_to_date">Up to date</string>
+    <string name="screen_preferences_app_update_available">Version %1$s is available</string>
+    <string name="screen_preferences_app_update_downloading">Downloading version %1$s…</string>
+    <string name="screen_preferences_app_update_ready">Tap to install version %1$s</string>
+    <string name="screen_preferences_app_update_failed">Update check failed — tap to retry</string>
 </resources>

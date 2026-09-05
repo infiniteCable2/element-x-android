@@ -16,6 +16,7 @@ import io.element.android.libraries.indicator.api.IndicatorService
 
 class FakeIndicatorService : IndicatorService {
     private val showRoomListTopBarIndicatorResult: MutableState<Boolean> = mutableStateOf(false)
+    private val showAppUpdateIndicatorResult: MutableState<Boolean> = mutableStateOf(false)
     private val showSettingChatBackupIndicatorResult: MutableState<Boolean> = mutableStateOf(false)
 
     fun setShowRoomListTopBarIndicator(value: Boolean) {
@@ -26,9 +27,18 @@ class FakeIndicatorService : IndicatorService {
         showSettingChatBackupIndicatorResult.value = value
     }
 
+    fun setShowAppUpdateIndicator(value: Boolean) {
+        showAppUpdateIndicatorResult.value = value
+    }
+
     @Composable
     override fun showRoomListTopBarIndicator(): State<Boolean> {
         return showRoomListTopBarIndicatorResult
+    }
+
+    @Composable
+    override fun showAppUpdateIndicator(): State<Boolean> {
+        return showAppUpdateIndicatorResult
     }
 
     @Composable

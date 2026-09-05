@@ -201,6 +201,7 @@ private fun HomeScaffold(
                 selectedNavigationItem = state.currentHomeNavigationBarItem,
                 currentUserAndNeighbors = state.currentUserAndNeighbors,
                 showAvatarIndicator = state.showAvatarIndicator,
+                showAppUpdateIndicator = state.showAppUpdateIndicator,
                 areSearchResultsDisplayed = if (roomListState.globalSearchState.isEnabled) {
                     roomListState.globalSearchState.isSearchActive
                 } else {
