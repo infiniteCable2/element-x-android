@@ -21,6 +21,7 @@ import extension.allFeaturesImpl
 import extension.allLibrariesImpl
 import extension.allServicesImpl
 import extension.buildConfigFieldStr
+import extension.environmentOrGradleValue
 import extension.locales
 import extension.setupDependencyInjection
 import extension.testCommonDependencies
@@ -88,13 +89,14 @@ android {
             storePassword = "android"
         }
         register("nightly") {
-            keyAlias = System.getenv("ELEMENT_ANDROID_NIGHTLY_KEYID")
-                ?: project.property("signing.element.nightly.keyId") as? String?
-            keyPassword = System.getenv("ELEMENT_ANDROID_NIGHTLY_KEYPASSWORD")
-                ?: project.property("signing.element.nightly.keyPassword") as? String?
-            storeFile = file("./signature/nightly.keystore")
-            storePassword = System.getenv("ELEMENT_ANDROID_NIGHTLY_STOREPASSWORD")
-                ?: project.property("signing.element.nightly.storePassword") as? String?
+            keyAlias = environmentOrGradleValue("ELEMENT_ANDROID_NIGHTLY_KEYID", "signing.element.nightly.keyId")
+            keyPassword = environmentOrGradleValue("ELEMENT_ANDROID_NIGHTLY_KEYPASSWORD", "signing.element.nightly.keyPassword")
+            storeFile = file(
+                environmentOrGradleValue("ELEMENT_ANDROID_NIGHTLY_STOREFILE", "signing.element.nightly.storeFile")
+                    ?.ifBlank { null }
+                    ?: "./signature/nightly.keystore"
+            )
+            storePassword = environmentOrGradleValue("ELEMENT_ANDROID_NIGHTLY_STOREPASSWORD", "signing.element.nightly.storePassword")
         }
     }
 
@@ -289,6 +291,10 @@ dependencies {
         implementation(projects.libraries.pushproviders.unifiedpush)
     }
 
+    // Google Play Services fused location backend. Discovered at runtime via ServiceLoader by the
+    // location feature.
+    "gplayImplementation"(libs.maplibre.compose.location.runtime.gms)
+
     implementation(libs.appyx.core)
     implementation(libs.androidx.splash)
     implementation(libs.androidx.core)
@@ -326,6 +332,7 @@ licensee {
     allow("BSD-3-Clause")
     allow("EPL-1.0")
     allowUrl("https://opensource.org/license/bsd-3-clause")
+    allowUrl("https://opensource.org/license/bsd-2-clause")
     allowUrl("https://opensource.org/licenses/MIT")
     allowUrl("https://developer.android.com/studio/terms.html")
     allowUrl("https://www.zetetic.net/sqlcipher/license/")

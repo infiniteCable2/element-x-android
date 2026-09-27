@@ -18,4 +18,5 @@
     <string name="screen_preferences_app_update_downloading">Downloading version %1$s…</string>
     <string name="screen_preferences_app_update_ready">Tap to install version %1$s</string>
     <string name="screen_preferences_app_update_failed">Update check failed — tap to retry</string>
+    <string name="common_switch_account">Switch accounts</string>
 </resources>

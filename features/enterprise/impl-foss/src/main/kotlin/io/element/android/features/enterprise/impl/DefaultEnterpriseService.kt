@@ -20,6 +20,7 @@ import io.element.android.libraries.core.extensions.mapCatchingExceptions
 import io.element.android.libraries.core.uri.ensureProtocol
 import io.element.android.libraries.matrix.api.ClientUrlContentFetcher
 import io.element.android.libraries.matrix.api.TemporaryMatrixClientFactory
+import io.element.android.libraries.matrix.api.accountprovider.AccountProvider
 import io.element.android.libraries.matrix.api.core.SessionId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
@@ -34,9 +35,12 @@ class DefaultEnterpriseService(
 ) : EnterpriseService {
     override suspend fun isEnterpriseUser(sessionId: SessionId) = false
     override suspend fun tweakMasUrl(url: String, urlContentFetcher: ClientUrlContentFetcher) = url
-    override fun homeserverAllowList(): List<String> = emptyList()
+    override fun accountProviderAllowList(): List<AccountProvider> = emptyList()
+    override fun canConnectToAnyAccountProvider(): Boolean = true
     override fun isHomeserverEntryPrivate(): Boolean = true
-    override suspend fun isAllowedToConnectToHomeserver(homeserverUrl: String) = LockedHomeserverPolicy.isAllowed(homeserverUrl)
+    override suspend fun isAllowedToConnectToAccountProvider(accountProvider: AccountProvider): Boolean {
+        return LockedHomeserverPolicy.isAllowed(accountProvider.serverNameOrBaseUrl())
+    }
     override suspend fun isElementProEnforced(serverName: String): Boolean {
         val temporaryMatrixClient = temporaryMatrixClientFactory.create(serverName).getOrElse { return false }
         return temporaryMatrixClient.use { client ->

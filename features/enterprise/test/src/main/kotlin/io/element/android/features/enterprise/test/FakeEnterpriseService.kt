@@ -13,6 +13,7 @@ import io.element.android.compound.colors.SemanticColorsLightDark
 import io.element.android.features.enterprise.api.BugReportUrl
 import io.element.android.features.enterprise.api.EnterpriseService
 import io.element.android.libraries.matrix.api.ClientUrlContentFetcher
+import io.element.android.libraries.matrix.api.accountprovider.AccountProvider
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.tests.testutils.lambda.lambdaError
 import io.element.android.tests.testutils.simulateLongTask
@@ -22,9 +23,10 @@ import kotlinx.coroutines.flow.asStateFlow
 
 class FakeEnterpriseService(
     private val isEnterpriseUserResult: (SessionId) -> Boolean = { lambdaError() },
-    private val defaultHomeserverListResult: () -> List<String> = { emptyList() },
+    private val accountProviderAllowListResult: () -> List<AccountProvider> = { emptyList() },
+    private val canConnectToAnyAccountProviderResult: () -> Boolean = { true },
     private val isHomeserverEntryPrivateResult: () -> Boolean = { false },
-    private val isAllowedToConnectToHomeserverResult: (String) -> Boolean = { lambdaError() },
+    private val isAllowedToConnectToAccountProviderResult: (AccountProvider) -> Boolean = { lambdaError() },
     initialSemanticColors: SemanticColorsLightDark = SemanticColorsLightDark.default,
     initialBrandColor: Color? = null,
     private val overrideBrandColorResult: (SessionId?, String?) -> Unit = { _, _ -> lambdaError() },
@@ -45,14 +47,18 @@ class FakeEnterpriseService(
         tweakMasUrlResult(url, urlContentFetcher)
     }
 
-    override fun homeserverAllowList(): List<String> {
-        return defaultHomeserverListResult()
+    override fun accountProviderAllowList(): List<AccountProvider> {
+        return accountProviderAllowListResult()
     }
 
     override fun isHomeserverEntryPrivate(): Boolean = isHomeserverEntryPrivateResult()
 
-    override suspend fun isAllowedToConnectToHomeserver(homeserverUrl: String): Boolean = simulateLongTask {
-        isAllowedToConnectToHomeserverResult(homeserverUrl)
+    override fun canConnectToAnyAccountProvider(): Boolean {
+        return canConnectToAnyAccountProviderResult()
+    }
+
+    override suspend fun isAllowedToConnectToAccountProvider(accountProvider: AccountProvider): Boolean = simulateLongTask {
+        isAllowedToConnectToAccountProviderResult(accountProvider)
     }
 
     override suspend fun isElementProEnforced(serverName: String): Boolean = simulateLongTask {
