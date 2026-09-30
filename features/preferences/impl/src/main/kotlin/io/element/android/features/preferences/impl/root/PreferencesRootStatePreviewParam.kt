@@ -48,6 +48,7 @@ open class PreferencesRootStatePreviewParam : PreviewParameterProvider<Preferenc
                 showLabsItem = true,
                 snackbarMessage = SnackbarMessage(CommonStrings.common_verification_complete),
             ),
+            aPreferencesRootState(appUpdateState = AppUpdateState.Downloading("2.0", progressPercent = 42)),
             aPreferencesRootState(
                 showAnalyticsSettings = true,
                 showDeveloperSettings = true,

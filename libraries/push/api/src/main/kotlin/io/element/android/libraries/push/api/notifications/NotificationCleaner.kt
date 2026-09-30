@@ -32,7 +32,7 @@ interface NotificationCleaner {
      * @param sessionId the session the room belongs to.
      * @param roomId the room whose notifications are dismissed.
      */
-    fun clearMessagesForRoom(sessionId: SessionId, roomId: RoomId)
+    fun clearMessagesForRoom(sessionId: SessionId, roomId: RoomId, preserveBubble: Boolean = true)
 
     /**
      * Dismisses the message notifications of one thread, leaving the rest of the room's notifications in place.

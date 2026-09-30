@@ -8,6 +8,9 @@
 
 package io.element.android.features.roomdetails.impl
 
+import android.content.Intent
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -308,6 +311,37 @@ fun RoomDetailsView(
                 if (state.canShowSecurityAndPrivacy && state.roomType is RoomDetailsType.Room) {
                     SecurityAndPrivacyItem(
                         onClick = onSecurityAndPrivacyClick
+                    )
+                }
+                PreferenceSwitch(
+                    icon = CompoundIcons.Chat(),
+                    title = stringResource(R.string.screen_room_details_chat_bubble_title),
+                    subtitle = stringResource(
+                        if (state.canUseBubbles) R.string.screen_room_details_chat_bubble_subtitle
+                        else R.string.screen_room_details_chat_bubble_pin_disabled
+                    ),
+                    isChecked = state.isBubbleEnabled && state.canUseBubbles,
+                    enabled = state.canUseBubbles,
+                    onCheckedChange = { state.eventSink(RoomDetailsEvent.SetBubbleEnabled(it)) },
+                )
+                if (state.isBubbleEnabled && state.canUseBubbles && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val context = LocalContext.current
+                    ListItem(
+                        content = { Text(stringResource(R.string.screen_room_details_chat_bubble_settings)) },
+                        leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Notifications())),
+                        onClick = {
+                            runCatching {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APP_NOTIFICATION_BUBBLE_SETTINGS)
+                                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                )
+                            }.onFailure {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                                        .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                                )
+                            }
+                        },
                     )
                 }
             }

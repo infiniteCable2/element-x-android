@@ -431,6 +431,84 @@ class DefaultVoiceMessageComposerPresenterTest {
     }
 
     @Test
+    fun `present - releasing quick recording sends once without a preview tap`() = runTest {
+        val presenter = createDefaultVoiceMessageComposerPresenter()
+        presenter.test {
+            val initialState = awaitItem()
+            initialState.eventSink(VoiceMessageComposerEvent.RecorderEvent(VoiceMessageRecorderEvent.StartQuick))
+            initialState.eventSink(VoiceMessageComposerEvent.RecorderEvent(VoiceMessageRecorderEvent.StopAndSend))
+            advanceUntilIdle()
+
+            var currentState = awaitItem()
+            while (currentState.voiceMessageState != VoiceMessageState.Idle) {
+                currentState = awaitItem()
+            }
+            startRecordResult.assertions().isCalledOnce()
+            stopRecordResult.assertions().isCalledOnce().with(value(false))
+            sendVoiceMessageResult.assertions().isCalledOnce()
+            deleteRecordingResult.assertions().isCalledOnce()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `present - cancelling quick recording discards it without sending`() = runTest {
+        val presenter = createDefaultVoiceMessageComposerPresenter()
+        presenter.test {
+            val initialState = awaitItem()
+            initialState.eventSink(VoiceMessageComposerEvent.RecorderEvent(VoiceMessageRecorderEvent.StartQuick))
+            initialState.eventSink(VoiceMessageComposerEvent.RecorderEvent(VoiceMessageRecorderEvent.Cancel))
+            advanceUntilIdle()
+
+            assertThat(expectMostRecentItem().voiceMessageState).isEqualTo(VoiceMessageState.Idle)
+            stopRecordResult.assertions().isCalledOnce().with(value(true))
+            sendVoiceMessageResult.assertions().isNeverCalled()
+            deleteRecordingResult.assertions().isCalledOnce()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `present - too short quick recording is discarded`() = runTest {
+        val shortRecorder = FakeVoiceRecorder(
+            recordingDuration = 300.milliseconds,
+            startRecordResult = startRecordResult,
+            stopRecordResult = stopRecordResult,
+            deleteRecordingResult = deleteRecordingResult,
+        )
+        val presenter = createDefaultVoiceMessageComposerPresenter(voiceRecorder = shortRecorder)
+        presenter.test {
+            val initialState = awaitItem()
+            initialState.eventSink(VoiceMessageComposerEvent.RecorderEvent(VoiceMessageRecorderEvent.StartQuick))
+            initialState.eventSink(VoiceMessageComposerEvent.RecorderEvent(VoiceMessageRecorderEvent.StopAndSend))
+            advanceUntilIdle()
+
+            assertThat(expectMostRecentItem().voiceMessageState).isEqualTo(VoiceMessageState.Idle)
+            sendVoiceMessageResult.assertions().isNeverCalled()
+            deleteRecordingResult.assertions().isCalledOnce()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `present - granting permission after quick gesture does not start recording`() = runTest {
+        val permissionsPresenter = createFakePermissionsPresenter(recordPermissionGranted = false)
+        val presenter = createDefaultVoiceMessageComposerPresenter(permissionsPresenter = permissionsPresenter)
+        presenter.test {
+            val initialState = awaitItem()
+            initialState.eventSink(VoiceMessageComposerEvent.RecorderEvent(VoiceMessageRecorderEvent.StartQuick))
+            initialState.eventSink(VoiceMessageComposerEvent.RecorderEvent(VoiceMessageRecorderEvent.StopAndSend))
+            permissionsPresenter.setPermissionGranted()
+            advanceUntilIdle()
+
+            assertThat(initialState.voiceMessageState).isEqualTo(VoiceMessageState.Idle)
+            startRecordResult.assertions().isNeverCalled()
+            sendVoiceMessageResult.assertions().isNeverCalled()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `present - sending is tracked`() = runTest {
         val presenter = createDefaultVoiceMessageComposerPresenter()
         presenter.test {

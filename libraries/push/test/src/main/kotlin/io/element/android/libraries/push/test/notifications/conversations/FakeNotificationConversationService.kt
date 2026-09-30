@@ -19,7 +19,7 @@ class FakeNotificationConversationService : NotificationConversationService {
         roomName: String?,
         roomIsDirect: Boolean,
         roomAvatarUrl: String?,
-    ) = Unit
+    ) = true
 
     override suspend fun onLeftRoom(sessionId: SessionId, roomId: RoomId) = Unit
 

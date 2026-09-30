@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="bubble_no_message">Open the chat to see new messages.</string>
+    <string name="bubble_open_chat">Open chat</string>
+    <string name="bubble_self">You</string>
+</resources>

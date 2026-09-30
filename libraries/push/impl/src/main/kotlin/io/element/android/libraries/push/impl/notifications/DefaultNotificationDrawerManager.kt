@@ -22,6 +22,7 @@ import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.ui.media.ImageLoaderHolder
 import io.element.android.libraries.push.api.notifications.NotificationCleaner
 import io.element.android.libraries.push.api.notifications.NotificationIdProvider
+import io.element.android.libraries.push.api.notifications.bubbles.ConversationBubbleService
 import io.element.android.libraries.push.impl.notifications.factories.NotificationCreator
 import io.element.android.libraries.push.impl.notifications.model.FallbackNotifiableEvent
 import io.element.android.libraries.push.impl.notifications.model.InviteNotifiableEvent
@@ -58,6 +59,7 @@ class DefaultNotificationDrawerManager(
     private val imageLoaderHolder: ImageLoaderHolder,
     private val activeNotificationsProvider: ActiveNotificationsProvider,
     private val lockScreenService: LockScreenService,
+    private val bubbleService: ConversationBubbleService,
     sessionObserver: SessionObserver,
 ) : NotificationCleaner {
     // TODO EAx add a setting per user for this
@@ -148,9 +150,10 @@ class DefaultNotificationDrawerManager(
      * Used to ignore events related to that room (no need to display notification) and clean any existing notification on this room.
      * Can also be called when a notification for this room is dismissed by the user.
      */
-    override fun clearMessagesForRoom(sessionId: SessionId, roomId: RoomId) {
+    override fun clearMessagesForRoom(sessionId: SessionId, roomId: RoomId, preserveBubble: Boolean) {
         notificationDisplayer.cancelNotification(roomId.value, NotificationIdProvider.getRoomMessagesNotificationId(sessionId))
         clearSummaryNotificationIfNeeded(sessionId)
+        if (preserveBubble) bubbleService.restoreAfterMessagesCleared(sessionId, roomId)
     }
 
     /**

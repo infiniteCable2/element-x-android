@@ -30,6 +30,7 @@ import io.element.android.libraries.matrix.ui.components.aMatrixUser
 import io.element.android.libraries.matrix.ui.media.test.FakeImageLoader
 import io.element.android.libraries.matrix.ui.media.test.FakeInitialsAvatarBitmapGenerator
 import io.element.android.libraries.push.api.notifications.NotificationBitmapLoader
+import io.element.android.libraries.push.test.notifications.bubbles.FakeConversationBubbleService
 import io.element.android.libraries.push.impl.notifications.DefaultNotificationBitmapLoader
 import io.element.android.libraries.push.impl.notifications.NotificationActionIds
 import io.element.android.libraries.push.impl.notifications.RoomEventGroupInfo
@@ -327,6 +328,20 @@ class DefaultNotificationCreatorTest : RobolectricTest() {
     }
 
     @Test
+    fun `selected room notification has bubble metadata unless app pin is enabled`() = runTest {
+        val bubbleService = FakeConversationBubbleService().apply { select(A_SESSION_ID, A_ROOM_ID) }
+        val sut = createNotificationCreator(bubbleService = bubbleService)
+
+        val bubbleNotification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent(body = "Hello")))
+        assertThat(bubbleNotification.bubbleMetadata).isNotNull()
+        assertThat(bubbleService.latestPreview.value?.latestMessage).isEqualTo("Hello")
+
+        bubbleService.isAvailable.value = false
+        val regularNotification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent(body = "Hello")))
+        assertThat(regularNotification.bubbleMetadata).isNull()
+    }
+
+    @Test
     fun `test createMessagesListNotification should bing and thread`() = runTest {
         val sut = createNotificationCreator(
             enterpriseService = FakeEnterpriseService(
@@ -457,6 +472,7 @@ fun createNotificationCreator(
         sdkIntProvider = FakeBuildVersionSdkIntProvider(Build.VERSION_CODES.R),
         initialsAvatarBitmapGenerator = FakeInitialsAvatarBitmapGenerator(),
     ),
+    bubbleService: FakeConversationBubbleService = FakeConversationBubbleService(),
 ): NotificationCreator {
     return DefaultNotificationCreator(
         context = context,
@@ -482,6 +498,7 @@ fun createNotificationCreator(
             clock = FakeSystemClock(),
         ),
         bitmapLoader = bitmapLoader,
+        bubbleService = bubbleService,
         acceptInvitationActionFactory = AcceptInvitationActionFactory(
             context = context,
             actionIds = NotificationActionIds(buildMeta),

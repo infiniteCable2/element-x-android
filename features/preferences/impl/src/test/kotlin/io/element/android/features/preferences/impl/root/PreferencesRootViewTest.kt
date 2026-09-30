@@ -12,6 +12,7 @@ package io.element.android.features.preferences.impl.root
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.AndroidComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onNodeWithText
@@ -336,6 +337,14 @@ class PreferencesRootViewTest : RobolectricTest() {
         onNode(hasText(text) and hasClickAction()).performScrollTo().performClick()
 
         eventsRecorder.assertSingle(PreferencesRootEvent.OnAppUpdateClick)
+    }
+
+    @Test
+    fun `app update shows download percentage in its supporting line`() = runAndroidComposeUiTest {
+        setView(aPreferencesRootState(appUpdateState = AppUpdateState.Downloading("26.09.6", progressPercent = 42)))
+
+        val progressText = activity!!.getString(CommonStrings.screen_preferences_app_update_downloading_progress, "26.09.6", 42)
+        onNodeWithText(progressText).performScrollTo().assertIsDisplayed()
     }
 
     @Test

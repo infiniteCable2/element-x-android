@@ -31,7 +31,7 @@ interface NotificationConversationService {
         roomName: String?,
         roomIsDirect: Boolean,
         roomAvatarUrl: String?,
-    )
+    ): Boolean
 
     /**
      * Called when a room is left.

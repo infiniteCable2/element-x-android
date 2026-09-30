@@ -93,13 +93,15 @@ class DefaultRoomGroupMessageCreator(
     ): Bitmap? {
         // Use the last event (most recent?)
         val event = events.reversed().firstOrNull { it.roomAvatarPath != null }
+            ?: events.reversed().firstOrNull { it.roomIsDm && !it.outGoingMessage && it.senderAvatarPath != null }
             ?: events.reversed().firstOrNull()
         return event?.let { event ->
+            val useSenderAvatar = event.roomAvatarPath == null && event.roomIsDm && !event.outGoingMessage
             bitmapLoader.getRoomBitmap(
                 avatarData = AvatarData(
-                    id = event.roomId.value,
+                    id = if (useSenderAvatar) event.senderId.value else event.roomId.value,
                     name = event.roomName,
-                    url = event.roomAvatarPath,
+                    url = event.roomAvatarPath ?: event.senderAvatarPath.takeIf { useSenderAvatar },
                     size = AvatarSize.RoomDetailsHeader,
                 ),
                 imageLoader = imageLoader,

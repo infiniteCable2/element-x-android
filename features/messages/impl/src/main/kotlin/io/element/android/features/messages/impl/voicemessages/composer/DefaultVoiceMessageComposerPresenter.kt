@@ -50,6 +50,7 @@ import io.element.android.services.analytics.api.AnalyticsService
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.io.File
@@ -76,6 +77,7 @@ class DefaultVoiceMessageComposerPresenter(
 
     private val permissionsPresenter = permissionsPresenterFactory.create(Manifest.permission.RECORD_AUDIO)
     private var pendingEvent: VoiceMessageRecorderEvent.Start? = null
+    private var quickRecordingStart: Job? = null
     private val mediaSender = mediaSenderFactory.create(timelineMode)
 
     @Composable
@@ -116,45 +118,7 @@ class DefaultVoiceMessageComposerPresenter(
             }
         }
 
-        fun handleVoiceMessageRecorderEvent(event: VoiceMessageRecorderEvent) {
-            pendingEvent = null
-            when (event) {
-                VoiceMessageRecorderEvent.Start -> {
-                    Timber.v("Voice message record button pressed")
-                    when {
-                        permissionState.permissionGranted -> {
-                            localCoroutineScope.startRecording()
-                        }
-                        else -> {
-                            Timber.i("Voice message permission needed")
-                            pendingEvent = VoiceMessageRecorderEvent.Start
-                            permissionState.eventSink(PermissionsEvent.RequestPermissions)
-                        }
-                    }
-                }
-                VoiceMessageRecorderEvent.Stop -> {
-                    Timber.v("Voice message stop button pressed")
-                    localCoroutineScope.finishRecording()
-                }
-                VoiceMessageRecorderEvent.Cancel -> {
-                    Timber.v("Voice message cancel button tapped")
-                    localCoroutineScope.cancelRecording()
-                }
-            }
-        }
-
-        fun handleVoiceMessagePlayerEvent(event: VoiceMessagePlayerEvent) {
-            localCoroutineScope.launch {
-                when (event) {
-                    VoiceMessagePlayerEvent.Play -> player.play()
-                    VoiceMessagePlayerEvent.Pause -> player.pause()
-                    is VoiceMessagePlayerEvent.Seek -> player.seek(event.position)
-                }
-            }
-        }
-
-        fun sendVoiceMessage(inReplyToEventId: EventId?) {
-            val finishedState = recorderState as? VoiceRecorderState.Finished
+        fun sendVoiceMessage(finishedState: VoiceRecorderState.Finished?, inReplyToEventId: EventId?) {
             if (finishedState == null) {
                 val exception = VoiceMessageException.FileException("No file to send")
                 analyticsService.trackError(exception)
@@ -182,6 +146,79 @@ class DefaultVoiceMessageComposerPresenter(
             }
         }
 
+        fun handleVoiceMessageRecorderEvent(event: VoiceMessageRecorderEvent) {
+            pendingEvent = null
+            when (event) {
+                VoiceMessageRecorderEvent.Start -> {
+                    Timber.v("Voice message record button pressed")
+                    when {
+                        permissionState.permissionGranted -> {
+                            localCoroutineScope.startRecording()
+                        }
+                        else -> {
+                            Timber.i("Voice message permission needed")
+                            pendingEvent = VoiceMessageRecorderEvent.Start
+                            permissionState.eventSink(PermissionsEvent.RequestPermissions)
+                        }
+                    }
+                }
+                VoiceMessageRecorderEvent.StartQuick -> {
+                    if (permissionState.permissionGranted) {
+                        if (quickRecordingStart == null && voiceRecorder.state.value is VoiceRecorderState.Idle) {
+                            quickRecordingStart = localCoroutineScope.startRecording()
+                        }
+                    } else {
+                        permissionState.eventSink(PermissionsEvent.RequestPermissions)
+                    }
+                }
+                VoiceMessageRecorderEvent.Stop -> {
+                    Timber.v("Voice message stop button pressed")
+                    localCoroutineScope.finishRecording()
+                }
+                VoiceMessageRecorderEvent.StopAndSend -> {
+                    val startJob = quickRecordingStart ?: return
+                    quickRecordingStart = null
+                    val inReplyToEventId = (messageComposerContext.composerMode as? MessageComposerMode.Reply)?.eventId
+                    localCoroutineScope.launch {
+                        startJob.join()
+                        if (voiceRecorder.state.value is VoiceRecorderState.Finished) return@launch
+                        voiceRecorder.stopRecord()
+                        audioFocus.releaseAudioFocus()
+                        val recording = voiceRecorder.state.value as? VoiceRecorderState.Finished ?: return@launch
+                        if (recording.duration < 500.milliseconds) {
+                            voiceRecorder.deleteRecording()
+                        } else {
+                            sendVoiceMessage(recording, inReplyToEventId)
+                        }
+                    }
+                }
+                VoiceMessageRecorderEvent.Cancel -> {
+                    Timber.v("Voice message cancel button tapped")
+                    val startJob = quickRecordingStart
+                    quickRecordingStart = null
+                    if (startJob == null) {
+                        localCoroutineScope.cancelRecording()
+                    } else {
+                        localCoroutineScope.launch {
+                            startJob.join()
+                            voiceRecorder.stopRecord(cancelled = true)
+                            audioFocus.releaseAudioFocus()
+                        }
+                    }
+                }
+            }
+        }
+
+        fun handleVoiceMessagePlayerEvent(event: VoiceMessagePlayerEvent) {
+            localCoroutineScope.launch {
+                when (event) {
+                    VoiceMessagePlayerEvent.Play -> player.play()
+                    VoiceMessagePlayerEvent.Pause -> player.pause()
+                    is VoiceMessagePlayerEvent.Seek -> player.seek(event.position)
+                }
+            }
+        }
+
         fun handleEvent(event: VoiceMessageComposerEvent) {
             when (event) {
                 is VoiceMessageComposerEvent.RecorderEvent -> handleVoiceMessageRecorderEvent(event.recorderEvent)
@@ -191,7 +228,7 @@ class DefaultVoiceMessageComposerPresenter(
                     // may reset composerMode before the coroutine runs.
                     val inReplyToEventId = (messageComposerContext.composerMode as? MessageComposerMode.Reply)?.eventId
                     localCoroutineScope.launch {
-                        sendVoiceMessage(inReplyToEventId)
+                        sendVoiceMessage(recorderState as? VoiceRecorderState.Finished, inReplyToEventId)
                     }
                 }
                 VoiceMessageComposerEvent.DeleteVoiceMessage -> {

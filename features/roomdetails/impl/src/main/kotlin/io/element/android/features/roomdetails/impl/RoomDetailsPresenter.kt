@@ -53,6 +53,9 @@ import io.element.android.libraries.matrix.ui.room.roomMemberIdentityStateChange
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
 import io.element.android.libraries.preferences.api.store.SessionPreferencesStore
 import io.element.android.libraries.push.api.notifications.NotificationCleaner
+import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
+import io.element.android.libraries.push.api.notifications.bubbles.ConversationBubbleService
+import io.element.android.libraries.push.api.notifications.conversations.NotificationConversationService
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.services.analytics.api.AnalyticsService
 import io.element.android.services.analyticsproviders.api.trackers.captureInteraction
@@ -77,6 +80,8 @@ class RoomDetailsPresenter(
     private val appPreferencesStore: AppPreferencesStore,
     private val sessionPreferencesStore: SessionPreferencesStore,
     private val notificationCleaner: NotificationCleaner,
+    private val bubbleService: ConversationBubbleService,
+    private val notificationConversationService: NotificationConversationService,
 ) : Presenter<RoomDetailsState> {
     @AssistedFactory
     interface Factory {
@@ -95,6 +100,9 @@ class RoomDetailsPresenter(
         val roomName by remember { derivedStateOf { roomInfo.name?.trim().orEmpty() } }
         val roomTopic by remember { derivedStateOf { roomInfo.topic } }
         val isFavorite by remember { derivedStateOf { roomInfo.isFavorite } }
+        val selectedBubbleRoom by bubbleService.selectedRoom.collectAsState()
+        val canUseBubbles by bubbleService.isAvailable.collectAsState(initial = false)
+        val isBubbleEnabled = selectedBubbleRoom == BubbleRoom(client.sessionId, room.roomId)
         val joinRule by remember { derivedStateOf { roomInfo.joinRule } }
         val hasNewContent by remember {
             derivedStateOf {
@@ -166,6 +174,23 @@ class RoomDetailsPresenter(
                     }
                 }
                 is RoomDetailsEvent.SetFavorite -> scope.setFavorite(event.isFavorite)
+                is RoomDetailsEvent.SetBubbleEnabled -> scope.launch {
+                    if (event.enabled && canUseBubbles) {
+                        val shortcutCreated = notificationConversationService.onSendMessage(
+                            sessionId = client.sessionId,
+                            roomId = room.roomId,
+                            roomName = roomName,
+                            roomIsDirect = isDm,
+                            roomAvatarUrl = roomAvatar ?: dmMember?.avatarUrl,
+                        )
+                        if (shortcutCreated) {
+                            bubbleService.select(client.sessionId, room.roomId)
+                            bubbleService.showSelectedBubble(roomName, roomAvatar ?: dmMember?.avatarUrl)
+                        }
+                    } else if (!event.enabled) {
+                        bubbleService.clear(client.sessionId, room.roomId)
+                    }
+                }
                 is RoomDetailsEvent.CopyToClipboard -> {
                     clipboardHelper.copyPlainText(event.text)
                     snackbarDispatcher.post(SnackbarMessage(CommonStrings.common_copied_to_clipboard))
@@ -201,6 +226,8 @@ class RoomDetailsPresenter(
             leaveRoomState = leaveRoomState,
             roomNotificationSettings = roomNotificationSettingsState.roomNotificationSettings(),
             isFavorite = isFavorite,
+            isBubbleEnabled = isBubbleEnabled,
+            canUseBubbles = canUseBubbles,
             displayRolesAndPermissionsSettings = !isDm && permissions.canEditRolesAndPermissions,
             isPublic = joinRule == JoinRule.Public,
             heroes = roomInfo.heroes,

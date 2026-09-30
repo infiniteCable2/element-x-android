@@ -675,6 +675,7 @@ fun TestScope.createDefaultNotificationDrawerManager(
         imageLoaderHolder = FakeImageLoaderHolder(),
         activeNotificationsProvider = activeNotificationsProvider,
         lockScreenService = lockScreenService,
+        bubbleService = io.element.android.libraries.push.test.notifications.bubbles.FakeConversationBubbleService(),
         sessionObserver = sessionObserver,
     )
 }

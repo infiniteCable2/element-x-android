@@ -29,11 +29,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.components.Text
+import io.element.android.libraries.textcomposer.R
 import io.element.android.libraries.ui.utils.time.formatShort
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
@@ -45,6 +47,7 @@ internal fun VoiceMessageRecording(
     levels: ImmutableList<Float>,
     duration: Duration,
     modifier: Modifier = Modifier,
+    showQuickRecordHint: Boolean = false,
 ) {
     Row(
         modifier = modifier
@@ -70,12 +73,20 @@ internal fun VoiceMessageRecording(
 
         Spacer(Modifier.size(20.dp))
 
-        LiveWaveformView(
-            modifier = Modifier
-                .height(26.dp)
-                .weight(1f),
-            levels = levels,
-        )
+        if (showQuickRecordHint) {
+            Text(
+                text = stringResource(R.string.screen_room_quick_voice_swipe_to_cancel),
+                color = ElementTheme.colors.textSecondary,
+                style = ElementTheme.typography.fontBodySmMedium,
+            )
+        } else {
+            LiveWaveformView(
+                modifier = Modifier
+                    .height(26.dp)
+                    .weight(1f),
+                levels = levels,
+            )
+        }
     }
 }
 
@@ -103,4 +114,10 @@ private fun RedRecordingDot() {
 @Composable
 internal fun VoiceMessageRecordingPreview() = ElementPreview {
     VoiceMessageRecording(List(100) { it.toFloat() / 100 }.toImmutableList(), 0.seconds)
+}
+
+@PreviewsDayNight
+@Composable
+internal fun VoiceMessageQuickRecordingPreview() = ElementPreview {
+    VoiceMessageRecording(List(100) { it.toFloat() / 100 }.toImmutableList(), 1.seconds, showQuickRecordHint = true)
 }

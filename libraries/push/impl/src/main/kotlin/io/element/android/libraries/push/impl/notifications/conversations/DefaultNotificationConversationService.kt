@@ -11,6 +11,7 @@ package io.element.android.libraries.push.impl.notifications.conversations
 import android.content.Context
 import android.content.pm.ShortcutInfo
 import android.os.Build
+import androidx.core.app.Person
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -29,6 +30,7 @@ import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.ui.media.ImageLoaderHolder
 import io.element.android.libraries.push.api.notifications.NotificationBitmapLoader
+import io.element.android.libraries.push.api.notifications.bubbles.ConversationBubbleService
 import io.element.android.libraries.push.api.notifications.conversations.NotificationConversationService
 import io.element.android.libraries.push.impl.intent.IntentProvider
 import io.element.android.libraries.push.impl.notifications.shortcut.createShortcutId
@@ -57,6 +59,7 @@ class DefaultNotificationConversationService(
     private val matrixClientProvider: MatrixClientProvider,
     private val imageLoaderHolder: ImageLoaderHolder,
     private val lockScreenService: LockScreenService,
+    private val bubbleService: ConversationBubbleService,
     sessionObserver: SessionObserver,
     @AppCoroutineScope private val coroutineScope: CoroutineScope,
 ) : NotificationConversationService {
@@ -85,10 +88,10 @@ class DefaultNotificationConversationService(
         roomName: String?,
         roomIsDirect: Boolean,
         roomAvatarUrl: String?,
-    ) {
+    ): Boolean {
         if (lockScreenService.isPinSetup().first()) {
             // We don't create shortcuts when a pin code is set for privacy reasons
-            return
+            return false
         }
 
         val categories = setOfNotNull(
@@ -96,7 +99,7 @@ class DefaultNotificationConversationService(
             SHARE_TARGET_CATEGORY,
         )
 
-        val client = matrixClientProvider.getOrRestore(sessionId).getOrNull() ?: return
+        val client = matrixClientProvider.getOrRestore(sessionId).getOrNull() ?: return false
         val imageLoader = imageLoaderHolder.get(client)
 
         val defaultShortcutIconSize = ShortcutManagerCompat.getIconMaxWidth(context)
@@ -115,6 +118,7 @@ class DefaultNotificationConversationService(
         val shortcutInfo = ShortcutInfoCompat.Builder(context, createShortcutId(sessionId, roomId))
             .setShortLabel(name)
             .setIcon(icon)
+            .setPersons(arrayOf(Person.Builder().setName(name).setKey(roomId.value).setIcon(icon).build()))
             .setIntent(intentProvider.getViewRoomIntent(sessionId, roomId, threadId = null, eventId = null))
             .setCategories(categories)
             .setLongLived(true)
@@ -126,13 +130,15 @@ class DefaultNotificationConversationService(
             }
             .build()
 
-        runCatchingExceptions { ShortcutManagerCompat.pushDynamicShortcut(context, shortcutInfo) }
+        return runCatchingExceptions { ShortcutManagerCompat.pushDynamicShortcut(context, shortcutInfo) }
             .onFailure {
                 Timber.e(it, "Failed to create shortcut for room $roomId in session $sessionId")
             }
+            .getOrDefault(false)
     }
 
     override suspend fun onLeftRoom(sessionId: SessionId, roomId: RoomId) {
+        bubbleService.clear(sessionId, roomId)
         val shortcutsToRemove = listOf(createShortcutId(sessionId, roomId))
         runCatchingExceptions {
             ShortcutManagerCompat.removeDynamicShortcuts(context, shortcutsToRemove)
@@ -149,6 +155,8 @@ class DefaultNotificationConversationService(
     }
 
     override suspend fun onAvailableRoomsChanged(sessionId: SessionId, roomIds: Set<RoomId>) {
+        bubbleService.selectedRoom.value?.takeIf { it.sessionId == sessionId && it.roomId !in roomIds }
+            ?.let { bubbleService.clear(it.sessionId, it.roomId) }
         runCatchingExceptions {
             val shortcuts = ShortcutManagerCompat.getDynamicShortcuts(context)
 

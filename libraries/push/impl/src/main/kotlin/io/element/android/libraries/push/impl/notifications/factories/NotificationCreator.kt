@@ -16,6 +16,7 @@ import androidx.annotation.ColorInt
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.MessagingStyle
 import androidx.core.app.Person
+import androidx.core.graphics.drawable.IconCompat
 import coil3.ImageLoader
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
@@ -31,6 +32,8 @@ import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.ui.model.getAvatarData
 import io.element.android.libraries.matrix.ui.model.getBestName
 import io.element.android.libraries.push.api.notifications.NotificationBitmapLoader
+import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
+import io.element.android.libraries.push.api.notifications.bubbles.ConversationBubbleService
 import io.element.android.libraries.push.impl.R
 import io.element.android.libraries.push.impl.notifications.RoomEventGroupInfo
 import io.element.android.libraries.push.impl.notifications.channels.NotificationChannels
@@ -47,6 +50,7 @@ import io.element.android.libraries.push.impl.notifications.shortcut.createShort
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.services.appnavstate.api.ROOM_OPENED_FROM_NOTIFICATION
 import io.element.android.services.toolbox.api.strings.StringProvider
+import kotlinx.coroutines.flow.first
 
 interface NotificationCreator {
     /**
@@ -120,6 +124,7 @@ class DefaultNotificationCreator(
     private val markAsReadActionFactory: MarkAsReadActionFactory,
     private val quickReplyActionFactory: QuickReplyActionFactory,
     private val bitmapLoader: NotificationBitmapLoader,
+    private val bubbleService: ConversationBubbleService,
     private val acceptInvitationActionFactory: AcceptInvitationActionFactory,
     private val rejectInvitationActionFactory: RejectInvitationActionFactory,
 ) : NotificationCreator {
@@ -198,13 +203,41 @@ class DefaultNotificationCreator(
         )
         val newEvents = messagingStyle.filterOutAlreadyDisplayedEvents(events)
         messagingStyle.addMessagesFromEvents(newEvents, imageLoader)
+        if (threadId == null && bubbleService.selectedRoom.value == BubbleRoom(roomInfo.sessionId, roomInfo.roomId)) {
+            bubbleService.updatePreview(roomInfo.sessionId, roomInfo.roomId, roomInfo.roomDisplayName, events.lastOrNull()?.body)
+        }
+        val bubbleMetadata = if (
+            threadId == null &&
+            bubbleService.selectedRoom.value == BubbleRoom(roomInfo.sessionId, roomInfo.roomId) &&
+            bubbleService.isAvailable.first()
+        ) {
+            val icon = largeIcon?.let(IconCompat::createWithBitmap)
+                ?: IconCompat.createWithResource(context, CommonDrawables.ic_notification)
+            NotificationCompat.BubbleMetadata.Builder(
+                pendingIntentFactory.createBubblePendingIntent(
+                    sessionId = roomInfo.sessionId,
+                    roomId = roomInfo.roomId,
+                ),
+                icon,
+            ).setDesiredHeight(600).build()
+        } else {
+            null
+        }
         return builder
+            .apply {
+                if (threadId == null) setShortcutId(createShortcutId(roomInfo.sessionId, roomInfo.roomId))
+                if (bubbleMetadata != null && existingNotification != null) {
+                    setChannelId(channelId)
+                    setSilent(false)
+                }
+            }
             .setCategory(category)
             .setNumber(events.size)
             .setOnlyAlertOnce(roomInfo.isUpdated || newEvents.isEmpty())
             .setWhen(lastMessageTimestamp)
             // MESSAGING_STYLE sets title and content for API 16 and above devices.
             .setStyle(messagingStyle)
+            .setBubbleMetadata(bubbleMetadata)
             .configureWith(notificationAccountParams)
             // Mark room/thread as read
             .addAction(markAsReadActionFactory.create(roomInfo, threadId))

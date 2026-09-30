@@ -13,6 +13,9 @@ import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -42,6 +45,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
@@ -233,6 +239,7 @@ fun TextComposer(
     }
 
     val hapticFeedback = LocalHapticFeedback.current
+    var quickRecordingGestureActive by remember { mutableStateOf(false) }
 
     fun performHapticFeedback() {
         hapticFeedback.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -379,6 +386,7 @@ fun TextComposer(
                 VoiceMessageRecording(
                     levels = voiceMessageState.levels,
                     duration = voiceMessageState.duration,
+                    showQuickRecordHint = quickRecordingGestureActive,
                 )
             VoiceMessageState.Idle -> {}
         }
@@ -413,6 +421,9 @@ fun TextComposer(
             onAddAttachment = onAddAttachment,
             onDeleteVoiceMessage = onDeleteVoiceMessage,
             onVoiceRecorderEvent = onVoiceRecorderEvent,
+            canStartQuickRecording = !canSendTextMessage && !composerMode.isEditing,
+            onQuickRecordingGestureActiveChange = { quickRecordingGestureActive = it },
+            onQuickRecordingHapticFeedback = ::performHapticFeedback,
             onResetComposerMode = onResetComposerMode,
         )
     }
@@ -463,9 +474,17 @@ private fun StandardLayout(
     onAddAttachment: () -> Unit,
     onDeleteVoiceMessage: () -> Unit,
     onVoiceRecorderEvent: (VoiceMessageRecorderEvent) -> Unit,
+    canStartQuickRecording: Boolean,
+    onQuickRecordingGestureActiveChange: (Boolean) -> Unit,
+    onQuickRecordingHapticFeedback: () -> Unit,
     onResetComposerMode: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val latestCanStartQuickRecording by rememberUpdatedState(canStartQuickRecording)
+    val latestVoiceMessageState by rememberUpdatedState(voiceMessageState)
+    val latestOnVoiceRecorderEvent by rememberUpdatedState(onVoiceRecorderEvent)
+    val latestOnQuickRecordingGestureActiveChange by rememberUpdatedState(onQuickRecordingGestureActiveChange)
+    val latestOnQuickRecordingHapticFeedback by rememberUpdatedState(onQuickRecordingHapticFeedback)
     Column(modifier = modifier) {
         if (isRoomEncrypted == false) {
             Spacer(Modifier.height(16.dp))
@@ -549,6 +568,41 @@ private fun StandardLayout(
                 modifier = Modifier
                     .padding(bottom = 5.dp, top = 5.dp, end = 6.dp, start = 6.dp)
                     .size(48.dp)
+                    .pointerInput(Unit) {
+                        val cancelDistance = 72.dp.toPx()
+                        awaitEachGesture {
+                            val down = awaitFirstDown(requireUnconsumed = false)
+                            val longPress = awaitLongPressOrCancellation(down.id)
+                            if (longPress != null && latestCanStartQuickRecording && latestVoiceMessageState is VoiceMessageState.Idle) {
+                                latestOnQuickRecordingGestureActiveChange(true)
+                                latestOnQuickRecordingHapticFeedback()
+                                latestOnVoiceRecorderEvent(VoiceMessageRecorderEvent.StartQuick)
+                                var gestureFinished = false
+                                var cancelled = false
+                                while (!gestureFinished) {
+                                    // Intercept the release before IconButton sees it, so a hold never also becomes a tap.
+                                    val pointerEvent = awaitPointerEvent(PointerEventPass.Initial)
+                                    val change = pointerEvent.changes.firstOrNull { it.id == longPress.id }
+                                    if (change == null) {
+                                        if (!cancelled) latestOnVoiceRecorderEvent(VoiceMessageRecorderEvent.Cancel)
+                                        gestureFinished = true
+                                    } else {
+                                        if (change.position.x <= longPress.position.x - cancelDistance && !cancelled) {
+                                            cancelled = true
+                                            latestOnQuickRecordingGestureActiveChange(false)
+                                            latestOnVoiceRecorderEvent(VoiceMessageRecorderEvent.Cancel)
+                                        }
+                                        if (change.changedToUpIgnoreConsumed()) {
+                                            if (!cancelled) latestOnVoiceRecorderEvent(VoiceMessageRecorderEvent.StopAndSend)
+                                            gestureFinished = true
+                                        }
+                                    }
+                                    pointerEvent.changes.forEach { it.consume() }
+                                }
+                                latestOnQuickRecordingGestureActiveChange(false)
+                            }
+                        }
+                    }
                     .clearAndSetSemantics {
                         contentDescription = endButtonContentDescription
                         onClick(null, null)

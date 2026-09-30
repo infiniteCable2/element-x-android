@@ -63,7 +63,7 @@ class NotificationBroadcastReceiverHandler(
                 handleSmartReply(sessionId, roomId, eventId, threadId, intent)
             }
             actionIds.dismissRoom -> if (roomId != null) {
-                notificationCleaner.clearMessagesForRoom(sessionId, roomId)
+                notificationCleaner.clearMessagesForRoom(sessionId, roomId, preserveBubble = false)
             }
             actionIds.dismissSummary ->
                 notificationCleaner.clearAllMessagesEvents(sessionId)

@@ -27,7 +27,7 @@ class FakeNotificationCleaner(
         clearAllMessagesEventsLambda(sessionId)
     }
 
-    override fun clearMessagesForRoom(sessionId: SessionId, roomId: RoomId) {
+    override fun clearMessagesForRoom(sessionId: SessionId, roomId: RoomId, preserveBubble: Boolean) {
         clearMessagesForRoomLambda(sessionId, roomId)
     }
 

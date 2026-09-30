@@ -169,6 +169,9 @@ class DefaultAppUpdater(
                 val body = requireNotNull(response.body) { "Update APK is empty" }
                 val contentLength = body.contentLength()
                 require(contentLength <= MAX_APK_BYTES || contentLength == -1L) { "Update APK is too large" }
+                if (contentLength > 0L) {
+                    mutableState.value = AppUpdateState.Downloading(update.versionName, 0)
+                }
                 body.byteStream().use { input ->
                     temporaryTarget.outputStream().buffered().use { output ->
                         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
@@ -180,6 +183,12 @@ class DefaultAppUpdater(
                             require(totalBytes <= MAX_APK_BYTES) { "Update APK is too large" }
                             digest.update(buffer, 0, count)
                             output.write(buffer, 0, count)
+                            if (contentLength > 0L) {
+                                val percent = (totalBytes * 100 / contentLength).toInt().coerceIn(0, 100)
+                                if ((mutableState.value as? AppUpdateState.Downloading)?.progressPercent != percent) {
+                                    mutableState.value = AppUpdateState.Downloading(update.versionName, percent)
+                                }
+                            }
                         }
                     }
                 }

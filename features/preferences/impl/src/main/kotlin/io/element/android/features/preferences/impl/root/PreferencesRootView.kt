@@ -354,7 +354,9 @@ private fun appUpdateSupportingText(state: AppUpdateState): String = when (state
     AppUpdateState.Checking -> stringResource(CommonStrings.screen_preferences_app_update_checking)
     AppUpdateState.UpToDate -> stringResource(CommonStrings.screen_preferences_app_update_up_to_date)
     is AppUpdateState.Available -> stringResource(CommonStrings.screen_preferences_app_update_available, state.versionName)
-    is AppUpdateState.Downloading -> stringResource(CommonStrings.screen_preferences_app_update_downloading, state.versionName)
+    is AppUpdateState.Downloading -> state.progressPercent?.let { percent ->
+        stringResource(CommonStrings.screen_preferences_app_update_downloading_progress, state.versionName, percent)
+    } ?: stringResource(CommonStrings.screen_preferences_app_update_downloading, state.versionName)
     is AppUpdateState.ReadyToInstall -> stringResource(CommonStrings.screen_preferences_app_update_ready, state.versionName)
     AppUpdateState.Failed -> stringResource(CommonStrings.screen_preferences_app_update_failed)
 }

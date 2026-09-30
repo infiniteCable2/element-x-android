@@ -12,6 +12,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import androidx.core.net.toUri
 import dev.zacsweers.metro.Inject
 import io.element.android.libraries.androidutils.uri.createIgnoredUri
 import io.element.android.libraries.di.annotations.ApplicationContext
@@ -21,6 +22,7 @@ import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.core.ThreadId
 import io.element.android.libraries.push.impl.intent.IntentProvider
 import io.element.android.libraries.push.impl.notifications.NotificationActionIds
+import io.element.android.libraries.push.impl.notifications.bubbles.BubbleLaunchActivity
 import io.element.android.libraries.push.impl.notifications.NotificationBroadcastReceiver
 import io.element.android.libraries.push.impl.notifications.TestNotificationReceiver
 import io.element.android.services.toolbox.api.systemclock.SystemClock
@@ -42,6 +44,24 @@ class PendingIntentFactory(
 
     fun createOpenThreadPendingIntent(sessionId: SessionId, roomId: RoomId, eventId: EventId?, threadId: ThreadId, extras: Bundle? = null): PendingIntent? {
         return createRoomPendingIntent(sessionId = sessionId, roomId = roomId, eventId = eventId, threadId = threadId, extras = extras)
+    }
+
+    fun createBubblePendingIntent(sessionId: SessionId, roomId: RoomId): PendingIntent {
+        val intent = Intent(context, BubbleLaunchActivity::class.java).apply {
+            data = "element-bubble://room/${sessionId.value}/${roomId.value}".toUri()
+            putExtra(BubbleLaunchActivity.EXTRA_SESSION_ID, sessionId.value)
+            putExtra(BubbleLaunchActivity.EXTRA_ROOM_ID, roomId.value)
+            putExtra(
+                BubbleLaunchActivity.EXTRA_OPEN_ROOM_INTENT,
+                intentProvider.getViewRoomIntent(sessionId, roomId, threadId = null, eventId = null),
+            )
+        }
+        return PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE,
+        )
     }
 
     private fun createRoomPendingIntent(sessionId: SessionId, roomId: RoomId?, eventId: EventId?, threadId: ThreadId?, extras: Bundle? = null): PendingIntent? {

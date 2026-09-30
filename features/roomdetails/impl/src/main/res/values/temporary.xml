@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="screen_room_details_chat_bubble_title">Chat bubble</string>
+    <string name="screen_room_details_chat_bubble_subtitle">Open this chat from a floating bubble. Enable bubbles in Android notification settings.</string>
+    <string name="screen_room_details_chat_bubble_pin_disabled">Unavailable while the app PIN is enabled.</string>
+    <string name="screen_room_details_chat_bubble_settings">Android bubble settings</string>
+</resources>

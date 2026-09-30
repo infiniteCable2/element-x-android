@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="screen_room_details_chat_bubble_title">Chat-Blase</string>
+    <string name="screen_room_details_chat_bubble_subtitle">Diesen Chat als schwebende Blase öffnen. Blasen müssen auch in den Android-Benachrichtigungseinstellungen erlaubt sein.</string>
+    <string name="screen_room_details_chat_bubble_pin_disabled">Mit aktiver App-PIN nicht verfügbar.</string>
+    <string name="screen_room_details_chat_bubble_settings">Android-Einstellungen für Chat-Blasen</string>
+</resources>

@@ -118,6 +118,8 @@ class RoomDetailsPresenterTest {
             appPreferencesStore = appPreferencesStore,
             notificationCleaner = notificationCleaner,
             sessionPreferencesStore = sessionPreferencesStore,
+            bubbleService = io.element.android.libraries.push.test.notifications.bubbles.FakeConversationBubbleService(),
+            notificationConversationService = io.element.android.libraries.push.test.notifications.conversations.FakeNotificationConversationService(),
         )
     }
 

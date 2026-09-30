@@ -14,9 +14,14 @@ import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.AndroidComposeUiTest
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.v2.runAndroidComposeUiTest
+import com.google.common.truth.Truth.assertThat
 import io.element.android.libraries.textcomposer.model.MessageComposerMode
+import io.element.android.libraries.textcomposer.model.VoiceMessageRecorderEvent
 import io.element.android.libraries.textcomposer.model.VoiceMessageState
 import io.element.android.libraries.textcomposer.model.aTextEditorStateMarkdown
 import io.element.android.libraries.ui.strings.CommonStrings
@@ -51,6 +56,41 @@ class TextComposerEndButtonTest : RobolectricTest() {
         onNodeWithContentDescription(getString(CommonStrings.a11y_voice_message_record)).assertIsDisplayed()
     }
 
+    @Test
+    fun `tapping microphone keeps the existing record and preview flow`() = runAndroidComposeUiTest {
+        val events = mutableListOf<VoiceMessageRecorderEvent>()
+        setTextComposer(text = "", composerMode = MessageComposerMode.Normal, onVoiceRecorderEvent = { events.add(it) })
+
+        onNodeWithContentDescription(getString(CommonStrings.a11y_voice_message_record)).performClick()
+
+        assertThat(events).containsExactly(VoiceMessageRecorderEvent.Start)
+    }
+
+    @Test
+    fun `holding microphone starts quick recording and releasing sends`() = runAndroidComposeUiTest {
+        val events = mutableListOf<VoiceMessageRecorderEvent>()
+        setTextComposer(text = "", composerMode = MessageComposerMode.Normal, onVoiceRecorderEvent = { events.add(it) })
+
+        onNodeWithContentDescription(getString(CommonStrings.a11y_voice_message_record)).performTouchInput { longClick() }
+
+        assertThat(events).containsExactly(VoiceMessageRecorderEvent.StartQuick, VoiceMessageRecorderEvent.StopAndSend).inOrder()
+    }
+
+    @Test
+    fun `swiping left after holding microphone cancels quick recording`() = runAndroidComposeUiTest {
+        val events = mutableListOf<VoiceMessageRecorderEvent>()
+        setTextComposer(text = "", composerMode = MessageComposerMode.Normal, onVoiceRecorderEvent = { events.add(it) })
+
+        onNodeWithContentDescription(getString(CommonStrings.a11y_voice_message_record)).performTouchInput {
+            down(center)
+            advanceEventTime(700)
+            moveTo(center.copy(x = center.x - 120f))
+            up()
+        }
+
+        assertThat(events).containsExactly(VoiceMessageRecorderEvent.StartQuick, VoiceMessageRecorderEvent.Cancel).inOrder()
+    }
+
     private fun AndroidComposeUiTest<ComponentActivity>.getString(resId: Int): String {
         return activity!!.getString(resId)
     }
@@ -58,6 +98,7 @@ class TextComposerEndButtonTest : RobolectricTest() {
     private fun AndroidComposeUiTest<ComponentActivity>.setTextComposer(
         text: String,
         composerMode: MessageComposerMode,
+        onVoiceRecorderEvent: (VoiceMessageRecorderEvent) -> Unit = {},
     ) {
         setContent {
             TextComposer(
@@ -69,7 +110,7 @@ class TextComposerEndButtonTest : RobolectricTest() {
                 onResetComposerMode = {},
                 onAddAttachment = {},
                 onDismissTextFormatting = {},
-                onVoiceRecorderEvent = {},
+                onVoiceRecorderEvent = onVoiceRecorderEvent,
                 onVoicePlayerEvent = {},
                 onSendVoiceMessage = {},
                 onDeleteVoiceMessage = {},

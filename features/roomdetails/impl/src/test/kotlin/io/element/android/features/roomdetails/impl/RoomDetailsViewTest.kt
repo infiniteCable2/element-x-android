@@ -285,6 +285,15 @@ class RoomDetailsViewTest : RobolectricTest() {
 
     @Config(qualifiers = "h1500dp")
     @Test
+    fun `click on chat bubble enables it for this room`() = runAndroidComposeUiTest {
+        val eventsRecorder = EventsRecorder<RoomDetailsEvent>()
+        setRoomDetailView(state = aRoomDetailsState(eventSink = eventsRecorder))
+        clickOn(R.string.screen_room_details_chat_bubble_title)
+        eventsRecorder.assertSingle(RoomDetailsEvent.SetBubbleEnabled(true))
+    }
+
+    @Config(qualifiers = "h1500dp")
+    @Test
     fun `click on leave emit expected Event`() = runAndroidComposeUiTest {
         val eventsRecorder = EventsRecorder<RoomDetailsEvent>()
         setRoomDetailView(
