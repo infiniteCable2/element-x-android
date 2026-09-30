@@ -9,6 +9,13 @@
 # do not exit when any command fails (issue with git flow)
 set +e
 
+# This upstream script only supports three-part versions and would overwrite the fork's
+# independent Android version-code counter without updating its four-part version name.
+if grep -q 'private const val forkReleaseNumber' plugins/src/main/kotlin/Versions.kt; then
+    printf 'This fork uses four-part versions. Follow release/README.md instead.\n' >&2
+    exit 1
+fi
+
 printf "\n================================================================================\n"
 printf "|                    Welcome to the release script!                            |\n"
 printf "================================================================================\n"

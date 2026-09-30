@@ -21,7 +21,6 @@ import androidx.compose.runtime.setValue
 import dev.zacsweers.metro.Inject
 import io.element.android.features.home.impl.roomlist.RoomListState
 import io.element.android.features.home.impl.spaces.HomeSpacesState
-import io.element.android.features.logout.api.direct.DirectLogoutState
 import io.element.android.features.rageshake.api.RageshakeFeatureAvailability
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
@@ -42,7 +41,6 @@ class HomePresenter(
     private val indicatorService: IndicatorService,
     private val roomListPresenter: Presenter<RoomListState>,
     private val homeSpacesPresenter: Presenter<HomeSpacesState>,
-    private val logoutPresenter: Presenter<DirectLogoutState>,
     private val rageshakeFeatureAvailability: RageshakeFeatureAvailability,
     private val sessionStore: SessionStore,
 ) : Presenter<HomeState> {
@@ -76,7 +74,6 @@ class HomePresenter(
         // Avatar indicator
         val showAvatarIndicator by indicatorService.showRoomListTopBarIndicator()
         val showAppUpdateIndicator by indicatorService.showAppUpdateIndicator()
-        val directLogoutState = logoutPresenter.present()
 
         fun handleEvent(event: HomeEvent) {
             when (event) {
@@ -100,7 +97,6 @@ class HomePresenter(
             homeSpacesState = homeSpacesState,
             snackbarMessage = snackbarMessage,
             canReportBug = canReportBug,
-            directLogoutState = directLogoutState,
             eventSink = ::handleEvent,
         )
     }

@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.TopAppBarScrollBehavior
@@ -104,7 +103,6 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeTopBar(
     selectedNavigationItem: HomeNavigationBarItem,
@@ -483,7 +481,6 @@ private fun StatusEmojiBadge(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @PreviewsDayNight
 @Composable
 internal fun HomeTopBarPreview() = ElementPreview {
@@ -504,7 +501,6 @@ internal fun HomeTopBarPreview() = ElementPreview {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @PreviewsDayNight
 @Composable
 internal fun HomeTopBarSpaceFiltersSelectedPreview() = ElementPreview {
@@ -525,7 +521,6 @@ internal fun HomeTopBarSpaceFiltersSelectedPreview() = ElementPreview {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @PreviewsDayNight
 @Composable
 internal fun HomeTopBarSpacesPreview() = ElementPreview {
@@ -546,7 +541,6 @@ internal fun HomeTopBarSpacesPreview() = ElementPreview {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @PreviewsDayNight
 @Composable
 internal fun HomeTopBarWithIndicatorPreview() = ElementPreview {
@@ -567,7 +561,6 @@ internal fun HomeTopBarWithIndicatorPreview() = ElementPreview {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @PreviewsDayNight
 @Composable
 internal fun HomeTopBarWithStatusPreview() = ElementPreview {
@@ -594,7 +587,6 @@ internal fun HomeTopBarWithStatusPreview() = ElementPreview {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @PreviewsDayNight
 @Composable
 internal fun HomeTopBarMultiAccountPreview() = ElementPreview {

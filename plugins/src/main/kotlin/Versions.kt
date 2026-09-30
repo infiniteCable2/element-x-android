@@ -42,10 +42,14 @@ private const val versionYear = 26
 private const val versionMonth = 9
 
 /**
- * Release number in the month. Value must be in [0,99].
- * Do not update this value. it is updated by the release script.
+ * Monotonic Android version-code counter for this fork. Keep increasing it within the month,
+ * independently of the upstream release number, so existing installations can update in place.
  */
-private const val versionReleaseNumber = 6
+private const val versionReleaseNumber = 7
+
+/** Upstream version 26.09.4, followed by the fork's first release based on it. */
+private const val upstreamReleaseNumber = 4
+private const val forkReleaseNumber = 1
 
 object Versions {
     /**
@@ -55,7 +59,7 @@ object Versions {
      * See comment above for the calculation method.
      */
     const val VERSION_CODE = (2000 + versionYear) * 10_000 + versionMonth * 100 + versionReleaseNumber
-    val VERSION_NAME = "$versionYear.${versionMonth.toString().padStart(2, '0')}.$versionReleaseNumber"
+    val VERSION_NAME = "$versionYear.${versionMonth.toString().padStart(2, '0')}.$upstreamReleaseNumber.$forkReleaseNumber"
 
     /**
      * Compile SDK version. Must be updated when a new Android version is released.
@@ -103,6 +107,8 @@ object Versions {
     init {
         require(versionMonth in 1..12) { "versionMonth must be in [1,12]" }
         require(versionReleaseNumber in 0..99) { "versionReleaseNumber must be in [0,99]" }
+        require(upstreamReleaseNumber in 0..99) { "upstreamReleaseNumber must be in [0,99]" }
+        require(forkReleaseNumber > 0) { "forkReleaseNumber must be positive" }
         require(BUILD_TOOLS_VERSION.startsWith(COMPILE_SDK.toString())) { "When updating COMPILE_SDK, please also update BUILD_TOOLS_VERSION" }
     }
 }
