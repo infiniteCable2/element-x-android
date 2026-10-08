@@ -22,7 +22,6 @@ android {
 dependencies {
     implementation(projects.libraries.appupdater.api)
     implementation(projects.libraries.di)
-    implementation(projects.libraries.featureflag.api)
     implementation(projects.libraries.matrix.api)
 
     implementation(libs.coroutines.core)

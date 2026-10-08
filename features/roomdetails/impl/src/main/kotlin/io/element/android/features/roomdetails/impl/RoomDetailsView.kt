@@ -37,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,7 +50,6 @@ import io.element.android.features.userprofile.api.UserProfileState
 import io.element.android.features.userprofile.api.UserProfileVerificationState
 import io.element.android.features.userprofile.shared.blockuser.BlockUserDialogs
 import io.element.android.features.userprofile.shared.blockuser.BlockUserSection
-import io.element.android.libraries.androidutils.system.copyToClipboard
 import io.element.android.libraries.architecture.coverage.ExcludeFromCoverage
 import io.element.android.libraries.designsystem.atomic.atoms.MatrixBadgeAtom
 import io.element.android.libraries.designsystem.atomic.molecules.MatrixBadgeRowMolecule
@@ -373,6 +371,7 @@ fun RoomDetailsView(
                 DebugInfoSection(
                     roomId = state.roomId,
                     roomVersion = state.roomVersion,
+                    onCopyRoomIdClick = { state.eventSink(RoomDetailsEvent.CopyRoomId) },
                 )
             }
         }
@@ -899,10 +898,9 @@ private fun OtherActionsSection(
 private fun DebugInfoSection(
     roomId: RoomId,
     roomVersion: String?,
+    onCopyRoomIdClick: () -> Unit,
 ) {
-    val context = LocalContext.current
     PreferenceCategory {
-        val toastMessage = stringResource(CommonStrings.common_copied_to_clipboard)
         ListItem(
             content = {
                 Text("Internal room ID")
@@ -916,12 +914,7 @@ private fun DebugInfoSection(
             },
             leadingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Code())),
             trailingContent = ListItemContent.Icon(IconSource.Vector(CompoundIcons.Copy())),
-            onClick = {
-                context.copyToClipboard(
-                    text = roomId.value,
-                    toastMessage = toastMessage,
-                )
-            },
+            onClick = onCopyRoomIdClick,
         )
         ListItem(
             content = {

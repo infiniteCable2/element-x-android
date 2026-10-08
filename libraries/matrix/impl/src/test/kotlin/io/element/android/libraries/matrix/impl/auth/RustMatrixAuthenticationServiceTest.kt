@@ -281,7 +281,7 @@ class RustMatrixAuthenticationServiceTest {
             cacheDirectory = File("/cache"),
             sessionStore = sessionStore,
             clientBuilderProvider = clientBuilderProvider,
-            workManagerScheduler = FakeWorkManagerScheduler(submitLambda = {}),
+            workManagerScheduler = FakeWorkManagerScheduler(submitLambda = {}, cancelLambda = { _, _ -> }),
             sqliteStoreBuilderProvider = sqliteStoreBuilderProvider,
         )
         return RustMatrixAuthenticationService(

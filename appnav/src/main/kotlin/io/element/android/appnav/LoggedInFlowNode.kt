@@ -88,12 +88,12 @@ import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.RoomIdOrAlias
+import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.core.toRoomIdOrAlias
 import io.element.android.libraries.matrix.api.permalink.PermalinkData
 import io.element.android.libraries.matrix.api.room.JoinedRoom
 import io.element.android.libraries.matrix.api.sync.SyncService
-import io.element.android.libraries.matrix.api.verification.SessionVerificationServiceListener
 import io.element.android.libraries.matrix.api.verification.VerificationRequest
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
 import io.element.android.libraries.push.api.notifications.conversations.NotificationConversationService
@@ -111,14 +111,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.parcelize.Parcelize
 import timber.log.Timber
-import java.time.Duration
-import java.time.Instant
 import java.util.Optional
 import java.util.UUID
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.minutes
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.toKotlinDuration
 import im.vector.app.features.analytics.plan.JoinedRoom as JoinedRoomAnalyticsEvent
 
 // The maximum number of room nodes that should be kept in the backstack at the same time.
@@ -162,6 +158,7 @@ class LoggedInFlowNode(
     private val createRoomEntryPoint: CreateRoomEntryPoint,
     private val activeLiveLocationShareManager: ActiveLiveLocationShareManager,
     private val customMapTilerConfigProvider: CustomMapTilerConfigProvider,
+    private val loggedInEventProcessorFactory: LoggedInEventProcessor.Factory,
 ) : BaseFlowNode<LoggedInFlowNode.NavTarget>(
     backstack = BackStack(
         initialElement = NavTarget.Placeholder,
@@ -177,44 +174,26 @@ class LoggedInFlowNode(
     interface Callback : Plugin {
         fun navigateToBugReport()
         fun navigateToAddAccount()
+        fun switchAccountAndOpenRoom(sessionId: SessionId, roomId: RoomId?)
     }
 
     private val callback: Callback = callback()
-    private val loggedInFlowProcessor = LoggedInEventProcessor(
-        snackbarDispatcher = snackbarDispatcher,
-        roomMembershipObserver = matrixClient.roomMembershipObserver,
-    )
+    private val loggedInFlowProcessor = loggedInEventProcessorFactory.create(snackbarDispatcher)
 
-    private val verificationListener = object : SessionVerificationServiceListener {
-        override fun onIncomingSessionRequest(verificationRequest: VerificationRequest.Incoming) {
-            // Without this launch the rendering and actual state of this Appyx node's children gets out of sync, resulting in a crash.
-            // This might be because this method is called back from Rust in a background thread.
-            lifecycleScope.launch {
-                val receivedAt = Instant.now()
-
-                // Wait until the app is in foreground to display the incoming verification request
-                appNavigationStateService.appNavigationState.first { it.isInForeground }
-
-                // TODO there should also be a timeout for > 10 minutes elapsed since the request was created, but the SDK doesn't expose that info yet
-                val now = Instant.now()
-                val elapsedTimeSinceReceived = Duration.between(receivedAt, now).toKotlinDuration()
-
-                // Discard the incoming verification request if it has timed out
-                if (elapsedTimeSinceReceived > 2.minutes) {
-                    Timber.w("Incoming verification request ${verificationRequest.details.flowId} discarded due to timeout.")
-                    return@launch
+    /**
+     * Display the incoming verification request, the app is expected to be in foreground.
+     */
+    fun onIncomingVerificationRequest(verificationRequest: VerificationRequest.Incoming) {
+        lifecycleScope.launch {
+            // Wait for the RoomList UI to be ready so the incoming verification screen can be displayed on top of it
+            // Otherwise, the RoomList UI may be incorrectly displayed on top
+            withTimeout(5.seconds) {
+                backstack.elements.first { elements ->
+                    elements.any { it.key.navTarget == NavTarget.Home }
                 }
-
-                // Wait for the RoomList UI to be ready so the incoming verification screen can be displayed on top of it
-                // Otherwise, the RoomList UI may be incorrectly displayed on top
-                withTimeout(5.seconds) {
-                    backstack.elements.first { elements ->
-                        elements.any { it.key.navTarget == NavTarget.Home }
-                    }
-                }
-
-                backstack.singleTop(NavTarget.IncomingVerificationRequest(verificationRequest))
             }
+
+            backstack.singleTop(NavTarget.IncomingVerificationRequest(verificationRequest))
         }
     }
 
@@ -229,7 +208,6 @@ class LoggedInFlowNode(
                 analyticsRoomListStateWatcher.start()
                 appNavigationStateService.onNavigateToSession(id, matrixClient.sessionId)
                 loggedInFlowProcessor.observeEvents(sessionCoroutineScope)
-                matrixClient.sessionVerificationService.setListener(verificationListener)
                 mediaPreviewConfigMigration()
                 sessionCoroutineScope.launch {
                     // Wait for the network to be connected before pre-fetching the max file upload size
@@ -258,7 +236,6 @@ class LoggedInFlowNode(
             onDestroy = {
                 appNavigationStateService.onLeavingSession(id)
                 loggedInFlowProcessor.stopObserving()
-                matrixClient.sessionVerificationService.setListener(null)
                 analyticsRoomListStateWatcher.stop()
             }
         )
@@ -383,6 +360,10 @@ class LoggedInFlowNode(
 
                     override fun navigateToBugReport() {
                         callback.navigateToBugReport()
+                    }
+
+                    override fun navigateToAddAccount() {
+                        callback.navigateToAddAccount()
                     }
                 }
                 homeEntryPoint.createNode(
@@ -595,9 +576,15 @@ class LoggedInFlowNode(
                     buildContext = buildContext,
                     params = ShareEntryPoint.Params(shareIntentData = navTarget.shareIntentData),
                     callback = object : ShareEntryPoint.Callback {
-                        override fun onDone(roomIds: List<RoomId>) {
+                        override fun onDone(sessionId: SessionId, roomIds: List<RoomId>) {
                             // Remove the incoming share screen
                             backstack.pop()
+
+                            if (sessionId != matrixClient.sessionId) {
+                                // The data has been shared using another session, switch to it
+                                callback.switchAccountAndOpenRoom(sessionId, roomIds.singleOrNull())
+                                return
+                            }
 
                             // Navigate to the room if the text/media was shared to a single one
                             roomIds.singleOrNull()?.let { roomId ->

@@ -47,6 +47,7 @@ import io.element.android.libraries.architecture.AsyncData
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.featureflag.api.FeatureFlagService
 import io.element.android.libraries.featureflag.api.FeatureFlags
+import io.element.android.libraries.featureflag.api.ShowAllActivityInRoomListFeature
 import io.element.android.libraries.fullscreenintent.api.FullScreenIntentPermissionsState
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.core.RoomId
@@ -118,6 +119,10 @@ class RoomListPresenter(
         val contextMenu = remember { mutableStateOf<RoomListState.ContextMenu>(RoomListState.ContextMenu.Hidden) }
         val declineInviteMenu = remember { mutableStateOf<RoomListState.DeclineInviteMenu>(RoomListState.DeclineInviteMenu.Hidden) }
 
+        val showAllActivity by produceState(initialValue = false) {
+            featureFlagService.isFeatureEnabledFlow(ShowAllActivityInRoomListFeature).collect { value = it }
+        }
+
         fun handleEvent(event: RoomListEvent) {
             when (event) {
                 is RoomListEvent.UpdateVisibleRange -> coroutineScope.launch {
@@ -165,13 +170,14 @@ class RoomListPresenter(
 
         val canReportRoom by produceState(false) { value = client.canReportRoom() }
         val showUnreadCount by produceState(false) {
-            value = featureFlagService.isFeatureEnabled(FeatureFlags.UnreadIndicatorCount)
+            featureFlagService.isFeatureEnabledFlow(FeatureFlags.UnreadIndicatorCount).collect { value = it }
         }
 
         val contentState = roomListContentState(
             securityBannerDismissed,
             showNewNotificationSoundBanner,
             showUnreadCount,
+            showAllActivity,
         )
 
         return RoomListState(
@@ -230,6 +236,7 @@ class RoomListPresenter(
         securityBannerDismissed: Boolean,
         showNewNotificationSoundBanner: Boolean,
         showUnreadCount: Boolean,
+        showAllActivity: Boolean,
     ): RoomListContentState {
         val roomSummaries by produceState(initialValue = AsyncData.Loading()) {
             roomListDataSource.roomSummariesFlow.collect { value = AsyncData.Success(it) }
@@ -262,6 +269,7 @@ class RoomListPresenter(
                     fullScreenIntentPermissionsState = fullScreenIntentPermissionsPresenter.present(),
                     batteryOptimizationState = batteryOptimizationPresenter.present(),
                     summaries = roomSummaries.dataOrNull().orEmpty().toImmutableList(),
+                    showAllActivity = showAllActivity,
                     seenRoomInvites = seenRoomInvites.toImmutableSet(),
                 )
             }
