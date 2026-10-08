@@ -17,7 +17,7 @@
             android:exported="false"
             android:resizeableActivity="true"
             android:launchMode="singleTop"
-            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+            android:theme="@style/Theme.Element.BubbleLaunch" />
         <service android:name=".push.FetchPushForegroundService"
             android:foregroundServiceType="shortService"
             android:exported="false"

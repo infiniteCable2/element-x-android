@@ -4,6 +4,7 @@
  */
 package io.element.android.libraries.push.impl.notifications.bubbles
 
+import android.app.ActivityOptions
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
@@ -16,6 +17,7 @@ import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
 import io.element.android.libraries.push.api.notifications.bubbles.ConversationBubbleService
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
@@ -48,12 +50,28 @@ class BubbleLaunchActivity : ComponentActivity() {
             finish()
             return
         }
-        lifecycleScope.launch {
-            val bubbleService = bindings<BubbleActivityBindings>().conversationBubbleService()
-            if (bubbleService.selectedRoom.value == room && bubbleService.isAvailable.first()) {
-                startActivity(openRoomIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        lifecycleScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            try {
+                val bubbleService = bindings<BubbleActivityBindings>().conversationBubbleService()
+                if (bubbleService.isAvailable.first() && bubbleService.selectedRoom.value == room) {
+                    startActivity(
+                        openRoomIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION),
+                        ActivityOptions.makeCustomAnimation(this@BubbleLaunchActivity, 0, 0).toBundle(),
+                    )
+                }
+            } finally {
+                finish()
             }
-            finish()
+        }
+    }
+
+    override fun finish() {
+        super.finish()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            overrideActivityTransition(OVERRIDE_TRANSITION_CLOSE, 0, 0)
+        } else {
+            @Suppress("DEPRECATION")
+            overridePendingTransition(0, 0)
         }
     }
 

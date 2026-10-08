@@ -23,6 +23,7 @@ import io.element.android.libraries.matrix.test.A_SESSION_ID
 import io.element.android.libraries.matrix.test.A_SESSION_ID_2
 import io.element.android.libraries.matrix.test.FakeMatrixClientProvider
 import io.element.android.libraries.matrixmedia.test.FakeImageLoaderHolder
+import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
 import io.element.android.libraries.push.impl.notifications.factories.FakeIntentProvider
 import io.element.android.libraries.push.impl.notifications.shortcut.createShortcutId
 import io.element.android.libraries.push.test.notifications.push.FakeNotificationBitmapLoader
@@ -51,6 +52,7 @@ class DefaultNotificationConversationServiceTest : RobolectricTest() {
 
         val shortcuts = ShortcutManagerCompat.getDynamicShortcuts(context)
         assertThat(shortcuts).isNotEmpty()
+        assertThat(shortcuts.single().locusId?.id).isEqualTo(BubbleRoom(A_SESSION_ID, A_ROOM_ID).locusId)
     }
 
     @Test

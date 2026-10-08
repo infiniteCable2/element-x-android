@@ -22,6 +22,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.core.app.ActivityCompat
+import androidx.core.content.LocusIdCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -39,7 +41,10 @@ import io.element.android.libraries.architecture.bindings
 import io.element.android.libraries.core.log.logger.LoggerTag
 import io.element.android.libraries.designsystem.theme.ElementThemeApp
 import io.element.android.libraries.designsystem.utils.snackbar.LocalSnackbarDispatcher
+import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
 import io.element.android.services.analytics.compose.LocalAnalyticsService
+import io.element.android.services.appnavstate.api.currentRoomId
+import io.element.android.services.appnavstate.api.currentSessionId
 import io.element.android.x.di.AppBindings
 import io.element.android.x.intent.SafeUriHandler
 import kotlinx.coroutines.launch
@@ -57,6 +62,7 @@ class MainActivity : NodeActivity() {
         super.onCreate(savedInstanceState)
         appBindings = bindings()
         setupLockManagement(appBindings.lockScreenService(), appBindings.lockScreenEntryPoint())
+        setupConversationLocusContext()
         enableEdgeToEdge()
         setContent {
             MainContent(appBindings)
@@ -151,6 +157,28 @@ class MainActivity : NodeActivity() {
                     if (state == LockScreenLockState.Locked) {
                         startActivity(lockScreenEntryPoint.pinUnlockIntent(this@MainActivity))
                     }
+                }
+            }
+        }
+    }
+
+    private fun setupConversationLocusContext() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                try {
+                    appBindings.appNavigationStateService().appNavigationState.collect { state ->
+                        val sessionId = state.navigationState.currentSessionId()
+                        val roomId = state.navigationState.currentRoomId()
+                        val locus = if (sessionId != null && roomId != null) {
+                            LocusIdCompat(BubbleRoom(sessionId, roomId).locusId)
+                        } else {
+                            null
+                        }
+                        ActivityCompat.setLocusContext(this@MainActivity, locus, null)
+                    }
+                } finally {
+                    // Only the visible main chat suppresses its bubble, not the bubble's launcher Activity.
+                    ActivityCompat.setLocusContext(this@MainActivity, null, null)
                 }
             }
         }

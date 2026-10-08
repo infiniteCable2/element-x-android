@@ -26,6 +26,7 @@ import io.element.android.libraries.matrix.api.platform.InitPlatformService
 import io.element.android.libraries.matrix.api.tracing.TracingService
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
 import io.element.android.services.analytics.api.AnalyticsService
+import io.element.android.services.appnavstate.api.AppNavigationStateService
 
 @ContributesTo(AppScope::class)
 interface AppBindings {
@@ -46,6 +47,8 @@ interface AppBindings {
     fun lockScreenEntryPoint(): LockScreenEntryPoint
 
     fun analyticsService(): AnalyticsService
+
+    fun appNavigationStateService(): AppNavigationStateService
 
     fun enterpriseService(): EnterpriseService
 

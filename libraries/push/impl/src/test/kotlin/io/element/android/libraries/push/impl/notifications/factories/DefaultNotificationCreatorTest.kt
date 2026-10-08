@@ -23,6 +23,7 @@ import io.element.android.libraries.matrix.test.AN_EVENT_ID
 import io.element.android.libraries.matrix.test.AN_EVENT_ID_2
 import io.element.android.libraries.matrix.test.A_COLOR_INT
 import io.element.android.libraries.matrix.test.A_ROOM_ID
+import io.element.android.libraries.matrix.test.A_ROOM_ID_2
 import io.element.android.libraries.matrix.test.A_SESSION_ID
 import io.element.android.libraries.matrix.test.A_THREAD_ID
 import io.element.android.libraries.matrix.test.core.aBuildMeta
@@ -30,6 +31,7 @@ import io.element.android.libraries.matrix.ui.components.aMatrixUser
 import io.element.android.libraries.matrixmedia.test.FakeImageLoader
 import io.element.android.libraries.matrixmedia.test.FakeInitialsAvatarBitmapGenerator
 import io.element.android.libraries.push.api.notifications.NotificationBitmapLoader
+import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
 import io.element.android.libraries.push.test.notifications.bubbles.FakeConversationBubbleService
 import io.element.android.libraries.push.impl.notifications.DefaultNotificationBitmapLoader
 import io.element.android.libraries.push.impl.notifications.NotificationActionIds
@@ -56,6 +58,7 @@ import io.element.android.tests.testutils.robolectric.RobolectricTest
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
 
 class DefaultNotificationCreatorTest : RobolectricTest() {
     @Test
@@ -334,11 +337,33 @@ class DefaultNotificationCreatorTest : RobolectricTest() {
 
         val bubbleNotification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent(body = "Hello")))
         assertThat(bubbleNotification.bubbleMetadata).isNotNull()
+        assertThat(bubbleNotification.bubbleMetadata?.isBubbleSuppressable).isTrue()
+        assertThat(bubbleNotification.locusId?.id).isEqualTo(BubbleRoom(A_SESSION_ID, A_ROOM_ID).locusId)
         assertThat(bubbleService.latestPreview.value?.latestMessage).isEqualTo("Hello")
 
         bubbleService.isAvailable.value = false
         val regularNotification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent(body = "Hello")))
         assertThat(regularNotification.bubbleMetadata).isNull()
+        assertThat(regularNotification.locusId).isNull()
+    }
+
+    @Test
+    @Config(sdk = [Build.VERSION_CODES.R])
+    fun `selected room still has bubble metadata on Android 11`() = runTest {
+        val bubbleService = FakeConversationBubbleService().apply { select(A_SESSION_ID, A_ROOM_ID) }
+        val sut = createNotificationCreator(bubbleService = bubbleService)
+        val notification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent()))
+        assertThat(notification.bubbleMetadata).isNotNull()
+        assertThat(notification.locusId?.id).isEqualTo(BubbleRoom(A_SESSION_ID, A_ROOM_ID).locusId)
+    }
+
+    @Test
+    fun `other rooms do not inherit the selected bubble locus`() = runTest {
+        val bubbleService = FakeConversationBubbleService().apply { select(A_SESSION_ID, A_ROOM_ID_2) }
+        val sut = createNotificationCreator(bubbleService = bubbleService)
+        val notification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent()))
+        assertThat(notification.bubbleMetadata).isNull()
+        assertThat(notification.locusId).isNull()
     }
 
     @Test
@@ -347,6 +372,7 @@ class DefaultNotificationCreatorTest : RobolectricTest() {
             enterpriseService = FakeEnterpriseService(
                 getNoisyNotificationChannelIdResult = { null },
             ),
+            bubbleService = FakeConversationBubbleService().apply { select(A_SESSION_ID, A_ROOM_ID) },
         )
         val result = sut.createMessagesListNotification(
             notificationAccountParams = aNotificationAccountParams(),
@@ -368,6 +394,8 @@ class DefaultNotificationCreatorTest : RobolectricTest() {
             events = listOf(aNotifiableMessageEvent()),
         )
         result.commonAssertions()
+        assertThat(result.bubbleMetadata).isNull()
+        assertThat(result.locusId).isNull()
     }
 
     @Test

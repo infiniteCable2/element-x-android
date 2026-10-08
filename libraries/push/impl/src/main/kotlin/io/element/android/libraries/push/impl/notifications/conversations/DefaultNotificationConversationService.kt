@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.pm.ShortcutInfo
 import android.os.Build
 import androidx.core.app.Person
+import androidx.core.content.LocusIdCompat
 import androidx.core.content.pm.ShortcutInfoCompat
 import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
@@ -30,6 +31,7 @@ import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrixmedia.api.ImageLoaderHolder
 import io.element.android.libraries.push.api.notifications.NotificationBitmapLoader
+import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
 import io.element.android.libraries.push.api.notifications.bubbles.ConversationBubbleService
 import io.element.android.libraries.push.api.notifications.conversations.NotificationConversationService
 import io.element.android.libraries.push.impl.intent.IntentProvider
@@ -116,6 +118,7 @@ class DefaultNotificationConversationService(
         )?.let(IconCompat::createWithBitmap)
 
         val shortcutInfo = ShortcutInfoCompat.Builder(context, createShortcutId(sessionId, roomId))
+            .setLocusId(LocusIdCompat(BubbleRoom(sessionId, roomId).locusId))
             .setShortLabel(name)
             .setIcon(icon)
             .setPersons(arrayOf(Person.Builder().setName(name).setKey(roomId.value).setIcon(icon).build()))
