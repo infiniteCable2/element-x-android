@@ -34,6 +34,8 @@ import io.element.android.libraries.matrix.test.room.aRoomInfo
 import io.element.android.libraries.matrix.ui.components.aMatrixUser
 import io.element.android.libraries.matrixmedia.test.FakeImageLoaderHolder
 import io.element.android.libraries.push.api.notifications.NotificationIdProvider
+import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
+import io.element.android.libraries.push.api.notifications.bubbles.ConversationBubbleService
 import io.element.android.libraries.push.impl.notifications.factories.NotificationAccountParams
 import io.element.android.libraries.push.impl.notifications.factories.NotificationCreator
 import io.element.android.libraries.push.impl.notifications.factories.aNotificationAccountParams
@@ -49,6 +51,7 @@ import io.element.android.libraries.push.impl.notifications.fixtures.aSimpleNoti
 import io.element.android.libraries.push.impl.notifications.fixtures.anInviteNotifiableEvent
 import io.element.android.libraries.push.impl.notifications.model.FallbackNotifiableEvent
 import io.element.android.libraries.push.impl.notifications.model.NotifiableEvent
+import io.element.android.libraries.push.test.notifications.bubbles.FakeConversationBubbleService
 import io.element.android.libraries.sessionstorage.api.SessionStore
 import io.element.android.libraries.sessionstorage.api.observer.SessionObserver
 import io.element.android.libraries.sessionstorage.test.InMemorySessionStore
@@ -67,7 +70,9 @@ import io.element.android.tests.testutils.lambda.lambdaRecorder
 import io.element.android.tests.testutils.lambda.value
 import io.mockk.every
 import io.mockk.mockk
+import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
@@ -588,6 +593,51 @@ class DefaultNotificationDrawerManagerTest {
     }
 
     @Test
+    fun `clearReadRoomsNotifications restores the selected bubble after cancelling read messages`() = runTest {
+        val bubbleService = aBubbleService(BubbleRoom(A_SESSION_ID, A_ROOM_ID))
+        val cancelNotificationResult = lambdaRecorder<String?, Int, Unit> { _, _ ->
+            verify(exactly = 0) { bubbleService.restoreAfterMessagesCleared(any(), any()) }
+        }
+        val sut = createClearReadRoomsManager(
+            cancelNotificationResult = cancelNotificationResult,
+            notifications = listOf(aRoomStatusBarNotification(A_ROOM_ID, 1)),
+            roomInfo = aRoomInfo(id = A_ROOM_ID),
+            bubbleService = bubbleService,
+        )
+        sut.clearReadRoomsNotifications(A_SESSION_ID)
+        runCurrent()
+        cancelNotificationResult.assertions().isCalledOnce().with(value(A_ROOM_ID.value), value(1))
+        verify(exactly = 1) { bubbleService.restoreAfterMessagesCleared(A_SESSION_ID, A_ROOM_ID) }
+    }
+
+    @Test
+    fun `clearReadRoomsNotifications does not restore a different room's bubble`() =
+        testReadNotificationDoesNotRestoreBubble(BubbleRoom(A_SESSION_ID, A_ROOM_ID_2))
+
+    @Test
+    fun `clearReadRoomsNotifications does not restore another account's bubble`() =
+        testReadNotificationDoesNotRestoreBubble(BubbleRoom(A_SESSION_ID_2, A_ROOM_ID))
+
+    @Test
+    fun `clearReadRoomsNotifications does not restore a disabled bubble`() = testReadNotificationDoesNotRestoreBubble(null)
+
+    @Test
+    fun `clearMessagesForRoom does not restore an explicitly dismissed bubble`() = runTest {
+        val bubbleService = aBubbleService(BubbleRoom(A_SESSION_ID, A_ROOM_ID))
+        val cancelNotificationResult = lambdaRecorder<String?, Int, Unit> { _, _ -> }
+        val sut = createDefaultNotificationDrawerManager(
+            notificationDisplayer = FakeNotificationDisplayer(cancelNotificationResult = cancelNotificationResult),
+            bubbleService = bubbleService,
+        )
+        sut.clearMessagesForRoom(A_SESSION_ID, A_ROOM_ID, preserveBubble = false)
+        runCurrent()
+        cancelNotificationResult.assertions().isCalledOnce().with(
+            value(A_ROOM_ID.value), value(NotificationIdProvider.getRoomMessagesNotificationId(A_SESSION_ID)),
+        )
+        verify(exactly = 0) { bubbleService.restoreAfterMessagesCleared(any(), any()) }
+    }
+
+    @Test
     fun `clearReadRoomsNotifications keeps notifications of rooms with unread messages`() = testKeepsNotification(
         aRoomInfo(id = A_ROOM_ID, numUnreadMessages = 1)
     )
@@ -656,15 +706,37 @@ class DefaultNotificationDrawerManagerTest {
     }
 
     private fun testKeepsNotification(roomInfo: RoomInfo?) = runTest {
+        val bubbleService = aBubbleService(BubbleRoom(A_SESSION_ID, A_ROOM_ID))
         val cancelNotificationResult = lambdaRecorder<String?, Int, Unit> { _, _ -> }
         val sut = createClearReadRoomsManager(
             cancelNotificationResult = cancelNotificationResult,
             notifications = listOf(aRoomStatusBarNotification(A_ROOM_ID, 1)),
             roomInfo = roomInfo,
+            bubbleService = bubbleService,
         )
         sut.clearReadRoomsNotifications(A_SESSION_ID)
         runCurrent()
         cancelNotificationResult.assertions().isNeverCalled()
+        verify(exactly = 0) { bubbleService.restoreAfterMessagesCleared(any(), any()) }
+    }
+
+    private fun testReadNotificationDoesNotRestoreBubble(selectedRoom: BubbleRoom?) = runTest {
+        val bubbleService = aBubbleService(selectedRoom)
+        val cancelNotificationResult = lambdaRecorder<String?, Int, Unit> { _, _ -> }
+        val sut = createClearReadRoomsManager(
+            cancelNotificationResult = cancelNotificationResult,
+            notifications = listOf(aRoomStatusBarNotification(A_ROOM_ID, 1)),
+            roomInfo = aRoomInfo(id = A_ROOM_ID),
+            bubbleService = bubbleService,
+        )
+        sut.clearReadRoomsNotifications(A_SESSION_ID)
+        runCurrent()
+        cancelNotificationResult.assertions().isCalledOnce().with(value(A_ROOM_ID.value), value(1))
+        verify(exactly = 0) { bubbleService.restoreAfterMessagesCleared(any(), any()) }
+    }
+
+    private fun aBubbleService(selectedRoom: BubbleRoom?): ConversationBubbleService = mockk(relaxed = true) {
+        every { this@mockk.selectedRoom } returns MutableStateFlow(selectedRoom)
     }
 
     private fun aRoomStatusBarNotification(roomId: RoomId, notificationId: Int): StatusBarNotification = mockk {
@@ -679,6 +751,7 @@ class DefaultNotificationDrawerManagerTest {
         clientResult: Result<FakeMatrixClient>? = null,
         summaryNotification: StatusBarNotification? = null,
         count: Int = notifications.size,
+        bubbleService: ConversationBubbleService = FakeConversationBubbleService(),
     ): DefaultNotificationDrawerManager {
         val matrixClient = FakeMatrixClient().apply {
             getRoomInfoLambda = { Result.success(roomInfo) }
@@ -691,6 +764,7 @@ class DefaultNotificationDrawerManagerTest {
                 countResult = { count },
             ),
             matrixClientProvider = FakeMatrixClientProvider(getClient = { clientResult ?: Result.success(matrixClient) }),
+            bubbleService = bubbleService,
         )
     }
 
@@ -779,6 +853,7 @@ fun TestScope.createDefaultNotificationDrawerManager(
     sessionObserver: SessionObserver = FakeSessionObserver(),
     analyticsService: FakeAnalyticsService = FakeAnalyticsService(),
     lockScreenService: LockScreenService = FakeLockScreenService(),
+    bubbleService: ConversationBubbleService = FakeConversationBubbleService(),
 ): DefaultNotificationDrawerManager {
     return DefaultNotificationDrawerManager(
         notificationDisplayer = notificationDisplayer,
@@ -800,7 +875,7 @@ fun TestScope.createDefaultNotificationDrawerManager(
         imageLoaderHolder = FakeImageLoaderHolder(),
         activeNotificationsProvider = activeNotificationsProvider,
         lockScreenService = lockScreenService,
-        bubbleService = io.element.android.libraries.push.test.notifications.bubbles.FakeConversationBubbleService(),
+        bubbleService = bubbleService,
         sessionObserver = sessionObserver,
     )
 }

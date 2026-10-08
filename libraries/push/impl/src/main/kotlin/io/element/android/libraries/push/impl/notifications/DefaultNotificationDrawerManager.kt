@@ -23,6 +23,7 @@ import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrixmedia.api.ImageLoaderHolder
 import io.element.android.libraries.push.api.notifications.NotificationCleaner
 import io.element.android.libraries.push.api.notifications.NotificationIdProvider
+import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
 import io.element.android.libraries.push.api.notifications.bubbles.ConversationBubbleService
 import io.element.android.libraries.push.impl.notifications.factories.NotificationCreator
 import io.element.android.libraries.push.impl.notifications.model.FallbackNotifiableEvent
@@ -210,6 +211,10 @@ class DefaultNotificationDrawerManager(
                 }
 
                 notificationDisplayer.cancelNotification(notification.tag, notification.id)
+                // The persistent bubble shares its notification with the selected room's messages.
+                if (bubbleService.selectedRoom.value == BubbleRoom(sessionId, roomId)) {
+                    bubbleService.restoreAfterMessagesCleared(sessionId, roomId)
+                }
             }
 
             clearSummaryNotificationIfNeeded(sessionId)
