@@ -18,6 +18,7 @@ import io.element.android.features.lockscreen.api.LockScreenService
 import io.element.android.features.lockscreen.test.FakeLockScreenService
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.room.RoomInfo
 import io.element.android.libraries.matrix.test.AN_EVENT_ID
 import io.element.android.libraries.matrix.test.AN_EVENT_ID_2
@@ -70,7 +71,6 @@ import io.element.android.tests.testutils.lambda.lambdaRecorder
 import io.element.android.tests.testutils.lambda.value
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.TestScope
@@ -594,9 +594,9 @@ class DefaultNotificationDrawerManagerTest {
 
     @Test
     fun `clearReadRoomsNotifications restores the selected bubble after cancelling read messages`() = runTest {
-        val bubbleService = aBubbleService(BubbleRoom(A_SESSION_ID, A_ROOM_ID))
+        val bubbleService = RecordingBubbleService(BubbleRoom(A_SESSION_ID, A_ROOM_ID))
         val cancelNotificationResult = lambdaRecorder<String?, Int, Unit> { _, _ ->
-            verify(exactly = 0) { bubbleService.restoreAfterMessagesCleared(any(), any()) }
+            assertThat(bubbleService.restoredRooms).isEmpty()
         }
         val sut = createClearReadRoomsManager(
             cancelNotificationResult = cancelNotificationResult,
@@ -607,7 +607,7 @@ class DefaultNotificationDrawerManagerTest {
         sut.clearReadRoomsNotifications(A_SESSION_ID)
         runCurrent()
         cancelNotificationResult.assertions().isCalledOnce().with(value(A_ROOM_ID.value), value(1))
-        verify(exactly = 1) { bubbleService.restoreAfterMessagesCleared(A_SESSION_ID, A_ROOM_ID) }
+        assertThat(bubbleService.restoredRooms).containsExactly(BubbleRoom(A_SESSION_ID, A_ROOM_ID))
     }
 
     @Test
@@ -623,7 +623,7 @@ class DefaultNotificationDrawerManagerTest {
 
     @Test
     fun `clearMessagesForRoom does not restore an explicitly dismissed bubble`() = runTest {
-        val bubbleService = aBubbleService(BubbleRoom(A_SESSION_ID, A_ROOM_ID))
+        val bubbleService = RecordingBubbleService(BubbleRoom(A_SESSION_ID, A_ROOM_ID))
         val cancelNotificationResult = lambdaRecorder<String?, Int, Unit> { _, _ -> }
         val sut = createDefaultNotificationDrawerManager(
             notificationDisplayer = FakeNotificationDisplayer(cancelNotificationResult = cancelNotificationResult),
@@ -634,7 +634,7 @@ class DefaultNotificationDrawerManagerTest {
         cancelNotificationResult.assertions().isCalledOnce().with(
             value(A_ROOM_ID.value), value(NotificationIdProvider.getRoomMessagesNotificationId(A_SESSION_ID)),
         )
-        verify(exactly = 0) { bubbleService.restoreAfterMessagesCleared(any(), any()) }
+        assertThat(bubbleService.restoredRooms).isEmpty()
     }
 
     @Test
@@ -706,7 +706,7 @@ class DefaultNotificationDrawerManagerTest {
     }
 
     private fun testKeepsNotification(roomInfo: RoomInfo?) = runTest {
-        val bubbleService = aBubbleService(BubbleRoom(A_SESSION_ID, A_ROOM_ID))
+        val bubbleService = RecordingBubbleService(BubbleRoom(A_SESSION_ID, A_ROOM_ID))
         val cancelNotificationResult = lambdaRecorder<String?, Int, Unit> { _, _ -> }
         val sut = createClearReadRoomsManager(
             cancelNotificationResult = cancelNotificationResult,
@@ -717,11 +717,11 @@ class DefaultNotificationDrawerManagerTest {
         sut.clearReadRoomsNotifications(A_SESSION_ID)
         runCurrent()
         cancelNotificationResult.assertions().isNeverCalled()
-        verify(exactly = 0) { bubbleService.restoreAfterMessagesCleared(any(), any()) }
+        assertThat(bubbleService.restoredRooms).isEmpty()
     }
 
     private fun testReadNotificationDoesNotRestoreBubble(selectedRoom: BubbleRoom?) = runTest {
-        val bubbleService = aBubbleService(selectedRoom)
+        val bubbleService = RecordingBubbleService(selectedRoom)
         val cancelNotificationResult = lambdaRecorder<String?, Int, Unit> { _, _ -> }
         val sut = createClearReadRoomsManager(
             cancelNotificationResult = cancelNotificationResult,
@@ -732,11 +732,16 @@ class DefaultNotificationDrawerManagerTest {
         sut.clearReadRoomsNotifications(A_SESSION_ID)
         runCurrent()
         cancelNotificationResult.assertions().isCalledOnce().with(value(A_ROOM_ID.value), value(1))
-        verify(exactly = 0) { bubbleService.restoreAfterMessagesCleared(any(), any()) }
+        assertThat(bubbleService.restoredRooms).isEmpty()
     }
 
-    private fun aBubbleService(selectedRoom: BubbleRoom?): ConversationBubbleService = mockk(relaxed = true) {
-        every { this@mockk.selectedRoom } returns MutableStateFlow(selectedRoom)
+    private class RecordingBubbleService(selectedRoom: BubbleRoom?) : ConversationBubbleService by FakeConversationBubbleService() {
+        override val selectedRoom = MutableStateFlow(selectedRoom)
+        val restoredRooms = mutableListOf<BubbleRoom>()
+
+        override fun restoreAfterMessagesCleared(sessionId: SessionId, roomId: RoomId) {
+            restoredRooms += BubbleRoom(sessionId, roomId)
+        }
     }
 
     private fun aRoomStatusBarNotification(roomId: RoomId, notificationId: Int): StatusBarNotification = mockk {
