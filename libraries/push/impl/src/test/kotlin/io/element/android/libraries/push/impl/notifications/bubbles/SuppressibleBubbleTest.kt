@@ -32,8 +32,11 @@ class SuppressibleBubbleTest : RobolectricTest() {
         assertThat(room.locusId).isEqualTo(BubbleRoom(A_SESSION_ID, A_ROOM_ID).locusId)
         assertThat(room.locusId).isNotEqualTo(BubbleRoom(A_SESSION_ID_2, A_ROOM_ID).locusId)
         assertThat(room.locusId).isNotEqualTo(BubbleRoom(A_SESSION_ID, A_ROOM_ID_2).locusId)
-        assertThat(BubbleRoom(SessionId("ab"), RoomId("c")).locusId)
-            .isNotEqualTo(BubbleRoom(SessionId("a"), RoomId("bc")).locusId)
+        // Accepted legacy IDs can contain delimiters, so concatenation alone is ambiguous.
+        val first = BubbleRoom(SessionId("@a:example.org!b:example.org"), RoomId("!c:example.org"))
+        val second = BubbleRoom(SessionId("@a:example.org"), RoomId("!b:example.org!c:example.org"))
+        assertThat(first.sessionId.value + first.roomId.value).isEqualTo(second.sessionId.value + second.roomId.value)
+        assertThat(first.locusId).isNotEqualTo(second.locusId)
     }
 
     @Test
