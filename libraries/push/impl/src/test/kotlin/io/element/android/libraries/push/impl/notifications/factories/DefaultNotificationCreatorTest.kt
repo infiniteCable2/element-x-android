@@ -338,6 +338,7 @@ class DefaultNotificationCreatorTest : RobolectricTest() {
         val bubbleNotification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent(body = "Hello")))
         assertThat(bubbleNotification.bubbleMetadata).isNotNull()
         assertThat(bubbleNotification.bubbleMetadata?.isBubbleSuppressable).isTrue()
+        assertThat(bubbleNotification.bubbleMetadata?.isNotificationSuppressed).isTrue()
         assertThat(bubbleNotification.locusId?.id).isEqualTo(BubbleRoom(A_SESSION_ID, A_ROOM_ID).locusId)
         assertThat(bubbleService.latestPreview.value?.latestMessage).isEqualTo("Hello")
 
@@ -354,6 +355,7 @@ class DefaultNotificationCreatorTest : RobolectricTest() {
         val sut = createNotificationCreator(bubbleService = bubbleService)
         val notification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent()))
         assertThat(notification.bubbleMetadata).isNotNull()
+        assertThat(notification.bubbleMetadata?.isNotificationSuppressed).isTrue()
         assertThat(notification.locusId?.id).isEqualTo(BubbleRoom(A_SESSION_ID, A_ROOM_ID).locusId)
     }
 

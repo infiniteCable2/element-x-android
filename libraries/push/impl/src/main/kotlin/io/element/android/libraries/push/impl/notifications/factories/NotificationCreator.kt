@@ -221,7 +221,7 @@ class DefaultNotificationCreator(
                     roomId = roomInfo.roomId,
                 ),
                 icon,
-            ).setDesiredHeight(600).build()
+            ).setDesiredHeight(600).setSuppressNotification(true).build()
         } else {
             null
         }
