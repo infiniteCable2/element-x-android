@@ -16,7 +16,6 @@ import androidx.annotation.ColorInt
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationCompat.MessagingStyle
 import androidx.core.app.Person
-import androidx.core.content.LocusIdCompat
 import androidx.core.graphics.drawable.IconCompat
 import coil3.ImageLoader
 import dev.zacsweers.metro.AppScope
@@ -37,7 +36,6 @@ import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
 import io.element.android.libraries.push.api.notifications.bubbles.ConversationBubbleService
 import io.element.android.libraries.push.impl.R
 import io.element.android.libraries.push.impl.notifications.RoomEventGroupInfo
-import io.element.android.libraries.push.impl.notifications.bubbles.withSuppressibleBubble
 import io.element.android.libraries.push.impl.notifications.channels.NotificationChannels
 import io.element.android.libraries.push.impl.notifications.debug.annotateForDebug
 import io.element.android.libraries.push.impl.notifications.factories.action.AcceptInvitationActionFactory
@@ -221,15 +219,15 @@ class DefaultNotificationCreator(
                     roomId = roomInfo.roomId,
                 ),
                 icon,
-            ).setDesiredHeight(600).setSuppressNotification(true).build()
+            ).setDesiredHeight(600).build()
         } else {
             null
         }
         return builder
             .apply {
                 if (threadId == null) setShortcutId(createShortcutId(roomInfo.sessionId, roomInfo.roomId))
-                // Real messages must follow the same visibility rule as the persistent bubble.
-                setLocusId(bubbleMetadata?.let { LocusIdCompat(BubbleRoom(roomInfo.sessionId, roomInfo.roomId).locusId) })
+                // Do not inherit the previous chat-dependent hiding context when updating a notification.
+                setLocusId(null)
                 if (bubbleMetadata != null && existingNotification != null) {
                     setChannelId(channelId)
                     setSilent(false)
@@ -266,7 +264,6 @@ class DefaultNotificationCreator(
             }
             .setTicker(tickerText)
             .build()
-            .withSuppressibleBubble(context)
     }
 
     override fun createRoomInvitationNotification(

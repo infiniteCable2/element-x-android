@@ -7,7 +7,6 @@ package io.element.android.libraries.push.impl.notifications.bubbles
 import android.content.Context
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
-import androidx.core.content.LocusIdCompat
 import androidx.core.graphics.drawable.IconCompat
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
@@ -151,7 +150,6 @@ class DefaultConversationBubbleService(
             )
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setShortcutId(createShortcutId(room.sessionId, room.roomId))
-            .setLocusId(LocusIdCompat(room.locusId))
             .addPerson(Person.Builder().setName(roomName).setKey(room.roomId.value).build())
             .setGroup(room.sessionId.value)
             .setContentIntent(openChat)
@@ -159,7 +157,6 @@ class DefaultConversationBubbleService(
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .build()
-            .withSuppressibleBubble(context)
         notificationDisplayer.showNotification(
             tag = NotificationCreator.messageTag(room.roomId, threadId = null),
             id = NotificationIdProvider.getRoomMessagesNotificationId(room.sessionId),

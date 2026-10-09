@@ -22,8 +22,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.core.app.ActivityCompat
-import androidx.core.content.LocusIdCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
@@ -59,7 +57,6 @@ class MainActivity : NodeActivity() {
         super.onCreate(savedInstanceState)
         appBindings = bindings()
         setupLockManagement(appBindings.lockScreenService(), appBindings.lockScreenEntryPoint())
-        setupConversationLocusContext()
         enableEdgeToEdge()
         setContent {
             MainContent(appBindings)
@@ -154,22 +151,6 @@ class MainActivity : NodeActivity() {
                     if (state == LockScreenLockState.Locked) {
                         startActivity(lockScreenEntryPoint.pinUnlockIntent(this@MainActivity))
                     }
-                }
-            }
-        }
-    }
-
-    private fun setupConversationLocusContext() {
-        lifecycleScope.launch {
-            repeatOnLifecycle(Lifecycle.State.STARTED) {
-                try {
-                    appBindings.appNavigationStateService().appNavigationState.collect { state ->
-                        val locus = LocusIdCompat(state.navigationState.conversationLocusId())
-                        ActivityCompat.setLocusContext(this@MainActivity, locus, null)
-                    }
-                } finally {
-                    // Only the visible main chat suppresses its bubble, not the bubble's launcher Activity.
-                    ActivityCompat.setLocusContext(this@MainActivity, null, null)
                 }
             }
         }

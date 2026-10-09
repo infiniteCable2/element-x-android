@@ -31,7 +31,6 @@ import io.element.android.libraries.matrix.ui.components.aMatrixUser
 import io.element.android.libraries.matrixmedia.test.FakeImageLoader
 import io.element.android.libraries.matrixmedia.test.FakeInitialsAvatarBitmapGenerator
 import io.element.android.libraries.push.api.notifications.NotificationBitmapLoader
-import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
 import io.element.android.libraries.push.test.notifications.bubbles.FakeConversationBubbleService
 import io.element.android.libraries.push.impl.notifications.DefaultNotificationBitmapLoader
 import io.element.android.libraries.push.impl.notifications.NotificationActionIds
@@ -337,9 +336,9 @@ class DefaultNotificationCreatorTest : RobolectricTest() {
 
         val bubbleNotification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent(body = "Hello")))
         assertThat(bubbleNotification.bubbleMetadata).isNotNull()
-        assertThat(bubbleNotification.bubbleMetadata?.isBubbleSuppressable).isTrue()
-        assertThat(bubbleNotification.bubbleMetadata?.isNotificationSuppressed).isTrue()
-        assertThat(bubbleNotification.locusId?.id).isEqualTo(BubbleRoom(A_SESSION_ID, A_ROOM_ID).locusId)
+        assertThat(bubbleNotification.bubbleMetadata?.isBubbleSuppressable).isFalse()
+        assertThat(bubbleNotification.bubbleMetadata?.isNotificationSuppressed).isFalse()
+        assertThat(bubbleNotification.locusId).isNull()
         assertThat(bubbleService.latestPreview.value?.latestMessage).isEqualTo("Hello")
 
         bubbleService.isAvailable.value = false
@@ -355,12 +354,39 @@ class DefaultNotificationCreatorTest : RobolectricTest() {
         val sut = createNotificationCreator(bubbleService = bubbleService)
         val notification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent()))
         assertThat(notification.bubbleMetadata).isNotNull()
-        assertThat(notification.bubbleMetadata?.isNotificationSuppressed).isTrue()
-        assertThat(notification.locusId?.id).isEqualTo(BubbleRoom(A_SESSION_ID, A_ROOM_ID).locusId)
+        assertThat(notification.bubbleMetadata?.isNotificationSuppressed).isFalse()
+        assertThat(notification.locusId).isNull()
     }
 
     @Test
-    fun `other rooms do not inherit the selected bubble locus`() = runTest {
+    fun `updating an old suppressible bubble removes chat hiding and restores unread notification`() = runTest {
+        val bubbleService = FakeConversationBubbleService().apply { select(A_SESSION_ID, A_ROOM_ID) }
+        val sut = createNotificationCreator(bubbleService = bubbleService)
+        val original = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent()))
+        val metadata = checkNotNull(original.bubbleMetadata)
+        val oldMetadata = Notification.BubbleMetadata.Builder(checkNotNull(metadata.intent), checkNotNull(metadata.icon))
+            .setDesiredHeight(600)
+            .setSuppressNotification(true)
+            .setSuppressableBubble(true)
+            .build()
+        val oldNotification = Notification.Builder.recoverBuilder(RuntimeEnvironment.getApplication(), original)
+            .setBubbleMetadata(oldMetadata)
+            .setLocusId(android.content.LocusId("old-chat-context"))
+            .build()
+
+        val result = sut.createRoomNotification(
+            events = listOf(aNotifiableMessageEvent(eventId = AN_EVENT_ID_2)),
+            existingNotification = oldNotification,
+        )
+
+        assertThat(result.bubbleMetadata).isNotNull()
+        assertThat(result.bubbleMetadata?.isBubbleSuppressable).isFalse()
+        assertThat(result.bubbleMetadata?.isNotificationSuppressed).isFalse()
+        assertThat(result.locusId).isNull()
+    }
+
+    @Test
+    fun `other rooms do not inherit the selected bubble`() = runTest {
         val bubbleService = FakeConversationBubbleService().apply { select(A_SESSION_ID, A_ROOM_ID_2) }
         val sut = createNotificationCreator(bubbleService = bubbleService)
         val notification = sut.createRoomNotification(events = listOf(aNotifiableMessageEvent()))

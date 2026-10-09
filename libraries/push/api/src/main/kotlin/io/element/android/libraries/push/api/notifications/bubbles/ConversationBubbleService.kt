@@ -9,10 +9,7 @@ import io.element.android.libraries.matrix.api.core.SessionId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 
-data class BubbleRoom(val sessionId: SessionId, val roomId: RoomId) {
-    /** Shared by the notification and the visible chat. Length-prefix the account to avoid collisions. */
-    val locusId: String get() = "element-room:${sessionId.value.length}:${sessionId.value}${roomId.value}"
-}
+data class BubbleRoom(val sessionId: SessionId, val roomId: RoomId)
 data class BubblePreview(val room: BubbleRoom, val roomName: String, val latestMessage: String?)
 
 /** A single, locally selected conversation. Android still controls whether its bubble is shown. */
