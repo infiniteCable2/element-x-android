@@ -59,7 +59,7 @@ internal data class AssistantVoiceState(
 /** The call belongs to the app, so hiding or recreating the system overlay leaves it running. */
 @SingleIn(AppScope::class)
 @Inject
-internal class AssistantVoiceController(
+class AssistantVoiceController(
     @ApplicationContext private val context: Context,
     @AppCoroutineScope private val scope: CoroutineScope,
     preferences: AppPreferencesStore,
@@ -71,7 +71,7 @@ internal class AssistantVoiceController(
 ) {
     private val resolver = AssistantChatResolver(preferences, sessions, lockScreen)
     private val mutableState = MutableStateFlow(AssistantVoiceState())
-    val state = mutableState.asStateFlow()
+    internal val state = mutableState.asStateFlow()
     private var callJob: Job? = null
     private var controller: ElementCallController? = null
 

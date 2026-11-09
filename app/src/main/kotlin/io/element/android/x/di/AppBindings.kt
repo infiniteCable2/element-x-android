@@ -28,6 +28,7 @@ import io.element.android.libraries.preferences.api.store.AppPreferencesStore
 import io.element.android.libraries.push.impl.intent.IntentProvider
 import io.element.android.libraries.sessionstorage.api.SessionStore
 import io.element.android.services.analytics.api.AnalyticsService
+import io.element.android.x.assistant.AssistantVoiceController
 
 @ContributesTo(AppScope::class)
 interface AppBindings {
@@ -44,6 +45,7 @@ interface AppBindings {
     fun preferencesStore(): AppPreferencesStore
     fun sessionStore(): SessionStore
     fun intentProvider(): IntentProvider
+    fun assistantVoiceController(): AssistantVoiceController
 
     fun migrationEntryPoint(): MigrationEntryPoint
 

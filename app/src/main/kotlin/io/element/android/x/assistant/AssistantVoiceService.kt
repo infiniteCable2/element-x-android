@@ -28,8 +28,6 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
-import dev.zacsweers.metro.AppScope
-import dev.zacsweers.metro.ContributesTo
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.libraries.architecture.bindings
 import io.element.android.x.di.AppBindings
@@ -57,14 +55,9 @@ class AssistantVoiceRecognitionService : RecognitionService() {
     override fun onCancel(listener: Callback) = Unit
 }
 
-@ContributesTo(AppScope::class)
-internal interface AssistantVoiceBindings {
-    fun assistantVoiceController(): AssistantVoiceController
-}
-
 class AssistantVoiceSessionService : VoiceInteractionSessionService() {
     override fun onNewSession(args: Bundle?): VoiceInteractionSession {
-        val controller = bindings<AssistantVoiceBindings>().assistantVoiceController()
+        val controller = bindings<AppBindings>().assistantVoiceController()
         return AssistantVoiceSession(this, controller)
     }
 }
