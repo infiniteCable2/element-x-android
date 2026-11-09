@@ -6,4 +6,18 @@
     <string name="screen_assistant_chat_not_configured">Öffne in Element die Details eines Chats und wähle ihn als Assistenten-Chat aus.</string>
     <string name="screen_assistant_chat_locked">Entsperre Element in der App, bevor du einen Chat über den Assistenten öffnest.</string>
     <string name="screen_assistant_chat_unavailable">Der ausgewählte Chat ist nicht verfügbar. Prüfe in Element das ausgewählte Konto und den Chat.</string>
+    <string name="screen_assistant_voice_connecting">Verbindet …</string>
+    <string name="screen_assistant_voice_listening">Hört zu</string>
+    <string name="screen_assistant_voice_speaking">Du sprichst</string>
+    <string name="screen_assistant_voice_replying">Assistent antwortet</string>
+    <string name="screen_assistant_voice_muted">Mikrofon stumm</string>
+    <string name="screen_assistant_voice_ended">Anruf beendet</string>
+    <string name="screen_assistant_voice_permission">Erlaube Element in den App-Einstellungen den Zugriff auf das Mikrofon, um anzurufen.</string>
+    <string name="screen_assistant_voice_direct">Wähle einen Direktchat mit zwei beigetretenen Mitgliedern.</string>
+    <string name="screen_assistant_voice_busy">Beende den laufenden Anruf, bevor du einen weiteren startest.</string>
+    <string name="screen_assistant_voice_failed">Der Audioanruf konnte nicht verbunden werden.</string>
+    <string name="screen_assistant_voice_mute">Stumm</string>
+    <string name="screen_assistant_voice_unmute">Mikrofon an</string>
+    <string name="screen_assistant_voice_hang_up">Auflegen</string>
+    <string name="screen_assistant_voice_hide">Minimieren</string>
 </resources>

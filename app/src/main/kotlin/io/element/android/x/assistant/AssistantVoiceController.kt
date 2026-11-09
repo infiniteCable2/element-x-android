@@ -1,0 +1,220 @@
+/*
+ * SPDX-License-Identifier: AGPL-3.0-only OR LicenseRef-Element-Commercial.
+ * Please see LICENSE files in the repository root for full details.
+ */
+
+package io.element.android.x.assistant
+
+import android.Manifest
+import android.app.KeyguardManager
+import android.content.ComponentName
+import android.content.Context
+import android.content.pm.PackageManager
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.service.voice.VoiceInteractionService
+import androidx.core.content.ContextCompat
+import dev.zacsweers.metro.AppScope
+import dev.zacsweers.metro.Inject
+import dev.zacsweers.metro.SingleIn
+import io.element.android.call.api.ElementCallConnection
+import io.element.android.call.api.ElementCallController
+import io.element.android.call.api.ElementCallData
+import io.element.android.call.api.ElementCallSnapshot
+import io.element.android.call.api.rtc.MatrixRtcConnectionState
+import io.element.android.call.api.rtc.id.RoomId
+import io.element.android.features.call.api.CurrentCall
+import io.element.android.features.call.api.CurrentCallService
+import io.element.android.features.callnative.impl.ElementCallControllers
+import io.element.android.features.lockscreen.api.LockScreenService
+import io.element.android.libraries.di.annotations.AppCoroutineScope
+import io.element.android.libraries.di.annotations.ApplicationContext
+import io.element.android.libraries.matrix.api.MatrixClientProvider
+import io.element.android.libraries.matrix.api.room.RoomMembershipState
+import io.element.android.libraries.preferences.api.store.AppPreferencesStore
+import io.element.android.libraries.preferences.api.store.AssistantChat
+import io.element.android.libraries.sessionstorage.api.SessionStore
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.seconds
+
+internal enum class AssistantVoicePhase {
+    Connecting, Listening, Speaking, Replying, Muted, Ended, OpenChat, NotConfigured, Locked, Permission, DirectChatRequired, Busy, Failed,
+}
+
+internal data class AssistantVoiceState(
+    val phase: AssistantVoicePhase = AssistantVoicePhase.Connecting,
+    val muted: Boolean = false,
+    val level: Float = 0f,
+)
+
+/** The call belongs to the app, so hiding or recreating the system overlay leaves it running. */
+@SingleIn(AppScope::class)
+@Inject
+internal class AssistantVoiceController(
+    @ApplicationContext private val context: Context,
+    @AppCoroutineScope private val scope: CoroutineScope,
+    preferences: AppPreferencesStore,
+    sessions: SessionStore,
+    lockScreen: LockScreenService,
+    private val clients: MatrixClientProvider,
+    private val controllers: ElementCallControllers,
+    private val currentCall: CurrentCallService,
+) {
+    private val resolver = AssistantChatResolver(preferences, sessions, lockScreen)
+    private val mutableState = MutableStateFlow(AssistantVoiceState())
+    val state = mutableState.asStateFlow()
+    private var callJob: Job? = null
+    private var controller: ElementCallController? = null
+
+    fun show() {
+        if (callJob?.isCompleted == false) return
+        update(AssistantVoicePhase.Connecting)
+        callJob = scope.launch(Dispatchers.Main.immediate) {
+            try {
+                start()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                update(AssistantVoicePhase.Failed)
+            }
+        }
+    }
+
+    fun toggleMute() {
+        val call = controller ?: return
+        val snapshot = call.state.value ?: return
+        call.setMicrophoneMuted(!snapshot.isMicrophoneMuted)
+    }
+
+    fun hangUp() {
+        callJob?.cancel()
+        update(AssistantVoicePhase.Ended)
+    }
+
+    suspend fun chatToOpen(): AssistantChat? {
+        val ready = resolver.resolve() as? AssistantChatState.Ready ?: return null
+        return ready.chat.takeIf { canStart() }
+    }
+
+    private suspend fun start() {
+        if (!canStart()) return update(AssistantVoicePhase.Locked)
+        val target = when (val selected = resolver.resolve()) {
+            AssistantChatState.NotConfigured -> return update(AssistantVoicePhase.NotConfigured)
+            AssistantChatState.Locked -> return update(AssistantVoicePhase.Locked)
+            AssistantChatState.Unavailable -> return update(AssistantVoicePhase.Failed)
+            is AssistantChatState.Ready -> selected.chat
+        }
+        if (!target.voiceEnabled) return update(AssistantVoicePhase.OpenChat)
+        if (!hasMicrophonePermission()) return update(AssistantVoicePhase.Permission)
+        if (hasOtherCall()) return update(AssistantVoicePhase.Busy)
+
+        val room = withTimeoutOrNull(15.seconds) {
+            clients.getOrRestore(target.sessionId).getOrNull()?.getJoinedRoom(target.roomId)
+        } ?: return update(AssistantVoicePhase.Failed)
+        if (!room.info().isDirect || room.info().joinedMembersCount != 2L) return update(AssistantVoicePhase.DirectChatRequired)
+        val peer = withTimeoutOrNull(5.seconds) { room.getDirectRoomMember() }
+            ?.takeIf { it.membership == RoomMembershipState.JOIN && it.userId != target.sessionId }
+            ?: return update(AssistantVoicePhase.DirectChatRequired)
+        val call = withTimeoutOrNull(15.seconds) { controllers.getOrBuild(target.sessionId) } ?: return update(AssistantVoicePhase.Failed)
+        if (resolver.resolve() != AssistantChatState.Ready(target) || !canStart()) return update(AssistantVoicePhase.Locked)
+        if (!hasMicrophonePermission()) return update(AssistantVoicePhase.Permission)
+        if (hasOtherCall()) return update(AssistantVoicePhase.Busy)
+
+        val roomId = RoomId(target.roomId.value)
+        controller = call
+        try {
+            call.startCall(ElementCallData(roomId = roomId, isAudioCall = true, isStartingCall = true))
+            call.setMaximized(false)
+            call.setMicrophonePermissionGranted(true)
+            if (withTimeoutOrNull(8.seconds) { call.state.first { it?.callData?.roomId == roomId } } == null) {
+                return update(AssistantVoicePhase.Failed)
+            }
+
+            var signalled = false
+            call.state.first { snapshot ->
+                if (snapshot == null || snapshot.callData.roomId != roomId) {
+                    update(AssistantVoicePhase.Ended)
+                    true
+                } else {
+                    when (snapshot.connection) {
+                        is ElementCallConnection.Ended -> {
+                            update(AssistantVoicePhase.Ended)
+                            true
+                        }
+                        is ElementCallConnection.Failed -> {
+                            update(AssistantVoicePhase.Failed)
+                            true
+                        }
+                        else -> {
+                            val next = snapshot.toVoiceState(peer.userId.value)
+                            mutableState.value = next
+                            if (!signalled && next.phase in readyPhases) {
+                                signalled = true
+                                playReadyTone()
+                            }
+                            false
+                        }
+                    }
+                }
+            }
+        } finally {
+            val snapshot = call.state.value
+            if (snapshot == null || snapshot.callData.roomId == roomId) call.hangUp()
+            controller = null
+        }
+    }
+
+    private fun update(phase: AssistantVoicePhase) {
+        mutableState.value = AssistantVoiceState(phase)
+    }
+
+    private fun canStart(): Boolean {
+        val keyguard = context.getSystemService(KeyguardManager::class.java) ?: return false
+        return !keyguard.isDeviceLocked && !keyguard.isKeyguardLocked &&
+            VoiceInteractionService.isActiveService(context, ComponentName(context, AssistantVoiceService::class.java))
+    }
+
+    private fun hasMicrophonePermission(): Boolean =
+        ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+
+    private fun hasOtherCall(): Boolean =
+        currentCall.currentCall.value != CurrentCall.None || controllers.withRunningCall() != null
+
+    private fun playReadyTone() {
+        scope.launch {
+            val tone = runCatching { ToneGenerator(AudioManager.STREAM_VOICE_CALL, 65) }.getOrNull() ?: return@launch
+            try {
+                tone.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
+                delay(180)
+            } finally {
+                tone.release()
+            }
+        }
+    }
+}
+
+private val readyPhases = setOf(AssistantVoicePhase.Listening, AssistantVoicePhase.Speaking, AssistantVoicePhase.Replying, AssistantVoicePhase.Muted)
+private const val SPEECH_LEVEL = 0.025f
+
+internal fun ElementCallSnapshot.toVoiceState(peerId: String): AssistantVoiceState {
+    val peer = roster.ranked.firstOrNull { it.userId.value == peerId && it.connection == MatrixRtcConnectionState.CONNECTED }
+    val local = if (isMicrophoneMuted) 0f else ownTile?.id?.memberId?.let(audioLevels::get)?.level ?: 0f
+    val remote = peer?.id?.memberId?.let(audioLevels::get)?.level ?: 0f
+    val phase = when {
+        connection !is ElementCallConnection.Connected || peer == null -> AssistantVoicePhase.Connecting
+        local >= SPEECH_LEVEL -> AssistantVoicePhase.Speaking
+        remote >= SPEECH_LEVEL -> AssistantVoicePhase.Replying
+        isMicrophoneMuted -> AssistantVoicePhase.Muted
+        else -> AssistantVoicePhase.Listening
+    }
+    return AssistantVoiceState(phase, isMicrophoneMuted, maxOf(local, remote).coerceIn(0f, 1f))
+}

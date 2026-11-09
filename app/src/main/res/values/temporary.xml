@@ -6,4 +6,18 @@
     <string name="screen_assistant_chat_not_configured">In Element, open the details of a chat and choose it as your assistant chat.</string>
     <string name="screen_assistant_chat_locked">Unlock Element in the app before opening a chat from the assistant.</string>
     <string name="screen_assistant_chat_unavailable">The selected chat is unavailable. Open Element and check the selected account and chat.</string>
+    <string name="screen_assistant_voice_connecting">Connecting…</string>
+    <string name="screen_assistant_voice_listening">Listening</string>
+    <string name="screen_assistant_voice_speaking">You are speaking</string>
+    <string name="screen_assistant_voice_replying">Assistant is speaking</string>
+    <string name="screen_assistant_voice_muted">Microphone muted</string>
+    <string name="screen_assistant_voice_ended">Call ended</string>
+    <string name="screen_assistant_voice_permission">Allow microphone access in the Element app settings to start a call.</string>
+    <string name="screen_assistant_voice_direct">Choose a direct chat with two joined members.</string>
+    <string name="screen_assistant_voice_busy">End the active call before starting another.</string>
+    <string name="screen_assistant_voice_failed">Could not connect the audio call.</string>
+    <string name="screen_assistant_voice_mute">Mute</string>
+    <string name="screen_assistant_voice_unmute">Unmute</string>
+    <string name="screen_assistant_voice_hang_up">Hang up</string>
+    <string name="screen_assistant_voice_hide">Minimise</string>
 </resources>

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <bool name="assistant_chat_supported">false</bool>
+    <bool name="assistant_voice_supported">false</bool>
 </resources>
