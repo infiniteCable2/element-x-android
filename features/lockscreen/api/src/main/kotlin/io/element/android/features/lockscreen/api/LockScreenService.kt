@@ -26,6 +26,9 @@ interface LockScreenService {
      */
     val lockState: StateFlow<LockScreenLockState>
 
+    /** Wait until the initial PIN check has updated [lockState]. */
+    suspend fun awaitInitialLockCheck() = Unit
+
     /**
      * Check if setting up the lock screen is required.
      * @return true if the lock screen is mandatory and not setup yet, false otherwise.

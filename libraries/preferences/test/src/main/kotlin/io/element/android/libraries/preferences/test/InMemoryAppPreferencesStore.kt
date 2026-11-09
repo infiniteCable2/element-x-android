@@ -59,7 +59,20 @@ class InMemoryAppPreferencesStore(
     override fun getAssistantChatFlow(): Flow<AssistantChat?> = assistantChat
 
     override suspend fun setAssistantChatEnabled(chat: AssistantChat, enabled: Boolean) {
-        assistantChat.update { current -> if (enabled) chat else current.takeUnless { it == chat } }
+        assistantChat.update { current ->
+            val sameTarget = current?.hasSameTargetAs(chat) == true
+            when {
+                enabled && !sameTarget -> chat.copy(voiceEnabled = false)
+                !enabled && sameTarget -> null
+                else -> current
+            }
+        }
+    }
+
+    override suspend fun setAssistantVoiceEnabled(chat: AssistantChat, enabled: Boolean) {
+        assistantChat.update { current ->
+            if (current?.hasSameTargetAs(chat) == true) current.copy(voiceEnabled = enabled) else current
+        }
     }
 
     override suspend fun setDeveloperModeEnabled(enabled: Boolean) {

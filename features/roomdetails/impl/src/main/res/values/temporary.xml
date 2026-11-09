@@ -7,4 +7,6 @@
     <string name="screen_room_details_assistant_chat_title">Android assistant chat</string>
     <string name="screen_room_details_assistant_chat_subtitle">Open this chat with the system assistant. Only one chat can be selected.</string>
     <string name="screen_room_details_assistant_chat_settings">Choose Element as the default assistant</string>
+    <string name="screen_room_details_assistant_voice_title">Start a voice call directly</string>
+    <string name="screen_room_details_assistant_voice_subtitle">Calling the Android assistant starts an audio call in this chat.</string>
 </resources>

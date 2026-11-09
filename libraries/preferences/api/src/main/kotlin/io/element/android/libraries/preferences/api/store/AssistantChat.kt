@@ -9,4 +9,6 @@ import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.SessionId
 
 /** A device-local assistant target; it is independent of the chat bubble. */
-data class AssistantChat(val sessionId: SessionId, val roomId: RoomId)
+data class AssistantChat(val sessionId: SessionId, val roomId: RoomId, val voiceEnabled: Boolean = false) {
+    fun hasSameTargetAs(other: AssistantChat): Boolean = sessionId == other.sessionId && roomId == other.roomId
+}

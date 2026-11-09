@@ -7,4 +7,6 @@
     <string name="screen_room_details_assistant_chat_title">Chat für den Android-Assistenten</string>
     <string name="screen_room_details_assistant_chat_subtitle">Diesen Chat über den Systemassistenten öffnen. Es kann nur ein Chat ausgewählt sein.</string>
     <string name="screen_room_details_assistant_chat_settings">Element als Standardassistent auswählen</string>
+    <string name="screen_room_details_assistant_voice_title">Sprachgespräch direkt starten</string>
+    <string name="screen_room_details_assistant_voice_subtitle">Beim Aufruf des Android-Assistenten startet ein Audioanruf in diesem Chat.</string>
 </resources>

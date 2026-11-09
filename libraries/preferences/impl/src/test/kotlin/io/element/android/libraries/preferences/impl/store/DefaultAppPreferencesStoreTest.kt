@@ -161,6 +161,22 @@ class DefaultAppPreferencesStoreTest : RobolectricTest() {
     }
 
     @Test
+    fun `assistant voice consent applies only to the selected chat`() = runTest {
+        val store = createStore()
+        val firstChat = AssistantChat(SessionId("@example:example.org"), RoomId("!first:example.org"))
+        val secondChat = firstChat.copy(roomId = RoomId("!second:example.org"))
+        store.setAssistantChatEnabled(firstChat, true)
+        assertThat(store.getAssistantChatFlow().first()?.voiceEnabled).isFalse()
+        store.setAssistantVoiceEnabled(firstChat, true)
+        store.setAssistantChatEnabled(firstChat, true)
+        assertThat(store.getAssistantChatFlow().first()).isEqualTo(firstChat.copy(voiceEnabled = true))
+
+        store.setAssistantChatEnabled(secondChat, true)
+        store.setAssistantVoiceEnabled(firstChat, true)
+        assertThat(store.getAssistantChatFlow().first()).isEqualTo(secondChat)
+    }
+
+    @Test
     fun `reset removes the assistant selection`() = runTest {
         val store = createStore()
         val chat = AssistantChat(SessionId("@example:example.org"), RoomId("!sample:example.org"))

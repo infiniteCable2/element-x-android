@@ -352,6 +352,14 @@ fun RoomDetailsView(
                         onCheckedChange = { state.eventSink(RoomDetailsEvent.SetAssistantChatEnabled(it)) },
                     )
                     if (state.isAssistantChatEnabled) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && (state.canUseAssistantVoice || state.isAssistantVoiceEnabled)) {
+                            PreferenceSwitch(
+                                title = stringResource(R.string.screen_room_details_assistant_voice_title),
+                                subtitle = stringResource(R.string.screen_room_details_assistant_voice_subtitle),
+                                isChecked = state.isAssistantVoiceEnabled,
+                                onCheckedChange = { state.eventSink(RoomDetailsEvent.SetAssistantVoiceEnabled(it)) },
+                            )
+                        }
                         val context = LocalContext.current
                         ListItem(
                             content = { Text(stringResource(R.string.screen_room_details_assistant_chat_settings)) },

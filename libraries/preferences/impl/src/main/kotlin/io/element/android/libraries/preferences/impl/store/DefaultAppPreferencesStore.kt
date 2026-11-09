@@ -40,6 +40,7 @@ private val hideInviteAvatarsKey = booleanPreferencesKey("hideInviteAvatars")
 private val otherAccountsExpandedKey = booleanPreferencesKey("otherAccountsExpanded")
 private val assistantChatSessionKey = stringPreferencesKey("assistantChatSession")
 private val assistantChatRoomKey = stringPreferencesKey("assistantChatRoom")
+private val assistantVoiceEnabledKey = booleanPreferencesKey("assistantVoiceEnabled")
 private val timelineMediaPreviewValueKey = stringPreferencesKey("timelineMediaPreviewValue")
 private val liveLocationMinimumDistanceUpdateKey = intPreferencesKey("liveLocationMinimumDistanceUpdate")
 private val logLevelKey = stringPreferencesKey("logLevel")
@@ -66,20 +67,32 @@ class DefaultAppPreferencesStore(
     override fun getAssistantChatFlow(): Flow<AssistantChat?> = store.data.map { prefs ->
         val sessionId = prefs[assistantChatSessionKey] ?: return@map null
         val roomId = prefs[assistantChatRoomKey] ?: return@map null
-        runCatching { AssistantChat(SessionId(sessionId), RoomId(roomId)) }.getOrNull()
+        runCatching { AssistantChat(SessionId(sessionId), RoomId(roomId), prefs[assistantVoiceEnabledKey] == true) }.getOrNull()
     }.distinctUntilChanged()
 
     override suspend fun setAssistantChatEnabled(chat: AssistantChat, enabled: Boolean) {
         store.edit { prefs ->
+            val sameTarget = prefs.matchesAssistantChat(chat)
             if (enabled) {
+                if (!sameTarget) prefs.remove(assistantVoiceEnabledKey)
                 prefs[assistantChatSessionKey] = chat.sessionId.value
                 prefs[assistantChatRoomKey] = chat.roomId.value
-            } else if (prefs[assistantChatSessionKey] == chat.sessionId.value && prefs[assistantChatRoomKey] == chat.roomId.value) {
+            } else if (sameTarget) {
                 prefs.remove(assistantChatSessionKey)
                 prefs.remove(assistantChatRoomKey)
+                prefs.remove(assistantVoiceEnabledKey)
             }
         }
     }
+
+    override suspend fun setAssistantVoiceEnabled(chat: AssistantChat, enabled: Boolean) {
+        store.edit { prefs ->
+            if (prefs.matchesAssistantChat(chat)) prefs[assistantVoiceEnabledKey] = enabled
+        }
+    }
+
+    private fun Preferences.matchesAssistantChat(chat: AssistantChat): Boolean =
+        this[assistantChatSessionKey] == chat.sessionId.value && this[assistantChatRoomKey] == chat.roomId.value
 
     override suspend fun setDeveloperModeEnabled(enabled: Boolean) {
         store.edit { prefs ->

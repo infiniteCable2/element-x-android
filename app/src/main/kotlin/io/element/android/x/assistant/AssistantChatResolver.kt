@@ -26,6 +26,7 @@ internal class AssistantChatResolver(
     private val lockScreenService: LockScreenService,
 ) {
     suspend fun resolve(): AssistantChatState = runCatchingExceptions {
+        lockScreenService.awaitInitialLockCheck()
         if (isAppLocked()) return@runCatchingExceptions AssistantChatState.Locked
         val chat = preferences.getAssistantChatFlow().first() ?: return@runCatchingExceptions AssistantChatState.NotConfigured
         val session = sessionStore.getSession(chat.sessionId.value)

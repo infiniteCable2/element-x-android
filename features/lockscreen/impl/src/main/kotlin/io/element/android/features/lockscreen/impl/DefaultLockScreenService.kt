@@ -23,7 +23,9 @@ import io.element.android.libraries.sessionstorage.api.observer.SessionListener
 import io.element.android.libraries.sessionstorage.api.observer.SessionObserver
 import io.element.android.services.appnavstate.api.AppForegroundStateService
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -49,6 +51,7 @@ class DefaultLockScreenService(
     override val lockState: StateFlow<LockScreenLockState> = _lockState
 
     private var lockJob: Job? = null
+    private val initialLockCheck: Deferred<Unit>
 
     init {
         pinCodeManager.addCallback(object : DefaultPinCodeManagerCallback() {
@@ -68,7 +71,9 @@ class DefaultLockScreenService(
                 }
             }
         })
-        coroutineScope.lockIfNeeded()
+        initialLockCheck = coroutineScope.async {
+            if (isPinSetup().first()) _lockState.value = LockScreenLockState.Locked
+        }
         observeAppForegroundState()
         observeSessionsState()
     }
@@ -106,6 +111,8 @@ class DefaultLockScreenService(
     override fun isPinSetup(): Flow<Boolean> {
         return pinCodeManager.hasPinCode()
     }
+
+    override suspend fun awaitInitialLockCheck() = initialLockCheck.await()
 
     override fun isSetupRequired(): Flow<Boolean> {
         return isPinSetup().map { isPinSetup ->

@@ -108,6 +108,7 @@ class RoomDetailsPresenter(
         val isBubbleEnabled = selectedBubbleRoom == BubbleRoom(client.sessionId, room.roomId)
         val currentAssistantChat = remember(client.sessionId, room.roomId) { AssistantChat(client.sessionId, room.roomId) }
         val selectedAssistantChat by remember { appPreferencesStore.getAssistantChatFlow() }.collectAsState(initial = null)
+        val isAssistantChatEnabled = selectedAssistantChat?.hasSameTargetAs(currentAssistantChat) == true
         val joinRule by remember { derivedStateOf { roomInfo.joinRule } }
         val hasNewContent by remember {
             derivedStateOf {
@@ -182,6 +183,9 @@ class RoomDetailsPresenter(
                 is RoomDetailsEvent.SetAssistantChatEnabled -> scope.launch {
                     appPreferencesStore.setAssistantChatEnabled(currentAssistantChat, event.enabled)
                 }
+                is RoomDetailsEvent.SetAssistantVoiceEnabled -> scope.launch {
+                    appPreferencesStore.setAssistantVoiceEnabled(currentAssistantChat, event.enabled)
+                }
                 is RoomDetailsEvent.SetBubbleEnabled -> scope.launch {
                     if (event.enabled && canUseBubbles) {
                         val shortcutCreated = notificationConversationService.onSendMessage(
@@ -242,7 +246,9 @@ class RoomDetailsPresenter(
             isFavorite = isFavorite,
             isBubbleEnabled = isBubbleEnabled,
             canUseBubbles = canUseBubbles,
-            isAssistantChatEnabled = selectedAssistantChat == currentAssistantChat,
+            isAssistantChatEnabled = isAssistantChatEnabled,
+            canUseAssistantVoice = roomInfo.isDirect && roomInfo.joinedMembersCount == 2L,
+            isAssistantVoiceEnabled = isAssistantChatEnabled && selectedAssistantChat?.voiceEnabled == true,
             displayRolesAndPermissionsSettings = !isDm && permissions.canEditRolesAndPermissions,
             isPublic = joinRule == JoinRule.Public,
             heroes = roomInfo.heroes,
