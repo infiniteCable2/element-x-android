@@ -28,6 +28,7 @@ import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.snapshots.toInt
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -69,6 +70,7 @@ import io.element.android.libraries.designsystem.utils.snackbar.SnackbarHost
 import io.element.android.libraries.designsystem.utils.snackbar.rememberSnackbarHostState
 import io.element.android.libraries.matrix.api.core.EventId
 import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.ui.strings.CommonStrings
 import kotlinx.coroutines.launch
 
@@ -78,6 +80,7 @@ fun HomeView(
     onRoomClick: (RoomId, EventId?) -> Unit,
     onSettingsClick: () -> Unit,
     onAddAccountClick: () -> Unit,
+    onSwitchToAccount: (SessionId) -> Unit,
     onSetUpRecoveryClick: () -> Unit,
     onConfirmRecoveryKeyClick: () -> Unit,
     onStartChatClick: () -> Unit,
@@ -130,6 +133,7 @@ fun HomeView(
             onStartChatClick = { if (firstThrottler.canHandle()) onStartChatClick() },
             onCreateSpaceClick = { if (firstThrottler.canHandle()) onCreateSpaceClick() },
             onMenuActionClick = onMenuActionClick,
+            onSwitchToAccount = onSwitchToAccount,
         )
 
         if (state.globalSearchState.isEnabled) {
@@ -167,6 +171,7 @@ private fun HomeScaffold(
     onStartChatClick: () -> Unit,
     onCreateSpaceClick: () -> Unit,
     onMenuActionClick: (RoomListMenuAction) -> Unit,
+    onSwitchToAccount: (SessionId) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     fun onRoomClick(room: RoomListRoomSummary) {
@@ -214,8 +219,10 @@ private fun HomeScaffold(
                 },
                 onMenuActionClick = onMenuActionClick,
                 onOpenSettings = onOpenSettings,
-                onAccountSwitch = {
-                    state.eventSink(HomeEvent.SwitchToAccount(it))
+                onAccountSwitch = { sessionId ->
+                    // The user has switched account by swiping their avatar, so they know the gesture.
+                    state.eventSink(HomeEvent.DismissSwipeAvatarAnnouncement)
+                    onSwitchToAccount(sessionId)
                 },
                 scrollBehavior = scrollBehavior,
                 displayFilters = state.displayRoomListFilters,
@@ -260,6 +267,7 @@ private fun HomeScaffold(
                         }
                     }
                 },
+                totalUnreadCount = state.totalUnreadCount.toInt(),
             )
         },
         floatingActionButtonPosition = FabPosition.Center,
@@ -342,6 +350,7 @@ private fun HomeFloatingActionButton(
 
 @Composable
 private fun HomeBottomBar(
+    totalUnreadCount: Int,
     currentHomeNavigationBarItem: HomeNavigationBarItem,
     onItemClick: (HomeNavigationBarItem) -> Unit,
     modifier: Modifier = Modifier,
@@ -362,6 +371,7 @@ private fun HomeBottomBar(
                 tooltipLabel = stringResource(item.labelRes),
                 isSelected = isSelected,
                 onClick = { onItemClick(item) },
+                counter = totalUnreadCount.takeIf { item == HomeNavigationBarItem.Chats && it > 0 }
             )
         }
     }
@@ -377,6 +387,7 @@ internal fun HomeViewPreview(@PreviewParameter(HomeStatePreviewParam::class) sta
         onRoomClick = { _, _ -> },
         onSettingsClick = {},
         onAddAccountClick = {},
+        onSwitchToAccount = {},
         onSetUpRecoveryClick = {},
         onConfirmRecoveryKeyClick = {},
         onStartChatClick = {},
@@ -398,6 +409,7 @@ internal fun HomeViewA11yPreview() = ElementPreview {
         onRoomClick = { _, _ -> },
         onSettingsClick = {},
         onAddAccountClick = {},
+        onSwitchToAccount = {},
         onSetUpRecoveryClick = {},
         onConfirmRecoveryKeyClick = {},
         onStartChatClick = {},

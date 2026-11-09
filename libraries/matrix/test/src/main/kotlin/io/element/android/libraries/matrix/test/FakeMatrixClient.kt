@@ -42,7 +42,6 @@ import io.element.android.libraries.matrix.api.scanner.ContentScanner
 import io.element.android.libraries.matrix.api.search.MessageSearchService
 import io.element.android.libraries.matrix.api.search.SearchBackfillService
 import io.element.android.libraries.matrix.api.spaces.SpaceService
-import io.element.android.libraries.matrix.api.sync.SlidingSyncVersion
 import io.element.android.libraries.matrix.api.sync.SyncService
 import io.element.android.libraries.matrix.api.user.DisplayedStatus
 import io.element.android.libraries.matrix.api.user.MatrixSearchUserResults
@@ -76,7 +75,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.TestScope
 import java.io.File
 import java.util.Optional
-import kotlin.jvm.optionals.getOrNull
 
 class FakeMatrixClient(
     override val sessionId: SessionId = A_SESSION_ID,
@@ -87,6 +85,7 @@ class FakeMatrixClient(
     override val sessionCoroutineScope: CoroutineScope = TestScope(),
     private val userDisplayName: String? = A_USER_NAME,
     private val userAvatarUrl: String? = AN_AVATAR_URL,
+    private val userDisplayedStatus: DisplayedStatus? = null,
     override val roomListService: RoomListService = FakeRoomListService(),
     override val spaceService: SpaceService = FakeSpaceService(),
     override val matrixMediaLoader: MatrixMediaLoader = FakeMatrixMediaLoader(),
@@ -102,6 +101,7 @@ class FakeMatrixClient(
     override val mediaPreviewService: MediaPreviewService = FakeMediaPreviewService(),
     override val roomMembershipObserver: RoomMembershipObserver = RoomMembershipObserver(),
     private val homeserverCapabilitiesProvider: FakeHomeserverCapabilitiesProvider = FakeHomeserverCapabilitiesProvider(),
+    private val totalUnreadCountResult: () -> Result<Long> = { Result.success(0L) },
     private val accountManagementUrlResult: (AccountManagementAction?) -> Result<String?> = { lambdaError() },
     private val resolveRoomAliasResult: suspend (RoomAlias) -> Result<Optional<ResolvedRoomAlias>> = {
         Result.success(
@@ -114,7 +114,6 @@ class FakeMatrixClient(
     private val getUrlLambda: (String) -> Result<ByteArray> = { lambdaError() },
     private val canDeactivateAccountResult: () -> Boolean = { lambdaError() },
     private val deactivateAccountResult: (String, Boolean) -> Result<Unit> = { _, _ -> lambdaError() },
-    private val currentSlidingSyncVersionLambda: () -> Result<SlidingSyncVersion> = { lambdaError() },
     private val ignoreUserResult: (UserId) -> Result<Unit> = { lambdaError() },
     private val canLinkNewDeviceResult: () -> Result<Boolean> = { lambdaError() },
     private val createLinkMobileHandlerResult: () -> Result<LinkMobileHandler> = { lambdaError() },
@@ -136,10 +135,12 @@ class FakeMatrixClient(
     override val searchBackfillService: SearchBackfillService = FakeSearchBackfillService(),
     private val getDatabaseSizesLambda: () -> Result<SdkStoreSizes> = { lambdaError() },
     private val resetWellKnownConfigLambda: () -> Result<Unit> = { lambdaError() },
+    private val destroyLambda: () -> Unit = { },
     private val enableAutomaticCallStatusLambda: (Boolean) -> Unit = { },
     override val contentScanner: ContentScanner? = null,
     private val isShuttingDownResult: () -> Boolean = { false },
 ) : MatrixClient {
+    override val totalUnreadCountFlow = MutableStateFlow(0L)
     var setDisplayNameCalled: Boolean = false
         private set
     var uploadAvatarCalled: Boolean = false
@@ -155,7 +156,9 @@ class FakeMatrixClient(
     var isUserStatusSupportedResult: Result<Boolean> = Result.success(true)
     var isProfilesSlidingSyncExtensionSupportedResult: Result<Boolean> = Result.success(true)
 
-    private val _userProfile: MutableStateFlow<MatrixUser> = MutableStateFlow(MatrixUser(sessionId, userDisplayName, userAvatarUrl))
+    private val _userProfile: MutableStateFlow<MatrixUser> = MutableStateFlow(
+        MatrixUser(sessionId, userDisplayName, userAvatarUrl, displayedStatus = userDisplayedStatus)
+    )
     override val userProfile: StateFlow<MatrixUser> = _userProfile
 
     var createRoomResult: (CreateRoomParameters) -> Result<RoomId> = { Result.success(A_ROOM_ID) }
@@ -246,7 +249,8 @@ class FakeMatrixClient(
     }
 
     override suspend fun getUserProfile(): Result<MatrixUser> = simulateLongTask {
-        val result = getProfileResults[sessionId]?.getOrNull() ?: MatrixUser(sessionId, userDisplayName, userAvatarUrl)
+        val result = getProfileResults[sessionId]?.getOrNull()
+            ?: MatrixUser(sessionId, userDisplayName, userAvatarUrl, displayedStatus = userDisplayedStatus)
         _userProfile.tryEmit(result)
         return Result.success(result)
     }
@@ -364,6 +368,10 @@ class FakeMatrixClient(
         removeAvatarResult = result
     }
 
+    fun givenTotalUnreadCount(value: Long) {
+        totalUnreadCountFlow.value = value
+    }
+
     private val visitedRoomsId: MutableList<RoomId> = mutableListOf()
 
     override suspend fun trackRecentlyVisitedRoom(roomId: RoomId): Result<Unit> {
@@ -403,10 +411,6 @@ class FakeMatrixClient(
 
     override suspend fun getUrl(url: String): Result<ByteArray> {
         return getUrlLambda(url)
-    }
-
-    override suspend fun currentSlidingSyncVersion(): Result<SlidingSyncVersion> {
-        return currentSlidingSyncVersionLambda()
     }
 
     override suspend fun canReportRoom(): Boolean {
@@ -465,7 +469,15 @@ class FakeMatrixClient(
         return resetWellKnownConfigLambda()
     }
 
+    override suspend fun destroy() {
+        destroyLambda()
+    }
+
     override fun homeserverCapabilities(): HomeserverCapabilitiesProvider {
         return homeserverCapabilitiesProvider
+    }
+
+    override fun totalUnreadCount(): Result<Long> {
+        return totalUnreadCountResult()
     }
 }

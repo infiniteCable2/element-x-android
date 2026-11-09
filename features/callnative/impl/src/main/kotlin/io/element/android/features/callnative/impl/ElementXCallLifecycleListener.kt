@@ -8,6 +8,7 @@
 package io.element.android.features.callnative.impl
 
 import io.element.android.call.api.ElementCallData
+import io.element.android.call.api.ElementCallEndReason
 import io.element.android.call.api.ElementCallLifecycleListener
 import io.element.android.features.call.api.CallData
 import io.element.android.features.call.api.CurrentCall
@@ -19,6 +20,7 @@ import io.element.android.services.appnavstate.api.AppForegroundStateService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 
 /**
  * Reports a native call back to the parts of Element X that already track calls.
@@ -32,12 +34,15 @@ class ElementXCallLifecycleListener(
     private val currentCallTracker: CurrentCallTracker,
     private val ringingCallTracker: RingingCallTracker,
     private val sessionCoroutineScope: CoroutineScope,
-    appForegroundStateService: AppForegroundStateService,
+    private val appForegroundStateService: AppForegroundStateService,
 ) : ElementCallLifecycleListener {
     override val isAppInForeground: Flow<Boolean> = appForegroundStateService.isInForeground
 
     override fun onCallStarted(callData: ElementCallData) {
         currentCallTracker.onCallStarted(CurrentCall.RoomCall(callData.roomId()))
+        // Keeps the sync running with the app in the background: the call's membership, its to-device media keys
+        // and the client's offline state all come through it, and SyncOrchestrator stops it otherwise.
+        appForegroundStateService.updateIsInCallState(true)
     }
 
     override fun onCallJoined(callData: ElementCallData) {
@@ -47,8 +52,10 @@ class ElementXCallLifecycleListener(
         sessionCoroutineScope.launch { ringingCallTracker.onCallJoined(callData.toCallData()) }
     }
 
-    override fun onCallEnded(callData: ElementCallData?) {
+    override fun onCallEnded(callData: ElementCallData?, reason: ElementCallEndReason) {
+        Timber.i("Native call ended: $reason")
         currentCallTracker.onCallEnded()
+        appForegroundStateService.updateIsInCallState(false)
         callData?.let { sessionCoroutineScope.launch { ringingCallTracker.onCallEnded(it.toCallData()) } }
     }
 

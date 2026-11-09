@@ -86,6 +86,7 @@ import io.element.android.libraries.matrix.api.room.RoomMembersState
 import io.element.android.libraries.matrix.api.room.history.RoomHistoryVisibility
 import io.element.android.libraries.matrix.api.room.powerlevels.permissionsAsState
 import io.element.android.libraries.matrix.api.timeline.Timeline
+import io.element.android.libraries.matrix.api.timeline.item.SendTarget
 import io.element.android.libraries.matrix.api.timeline.item.event.EventOrTransactionId
 import io.element.android.libraries.matrix.api.timeline.item.event.toEventOrTransactionId
 import io.element.android.libraries.matrix.ui.messages.reply.map
@@ -265,10 +266,9 @@ class MessagesPresenter(
                     if (selection != null) {
                         when (selection.action) {
                             SelectionAction.Forward -> {
-                                navigator.forwardEvents(timelineState.selectedEventIdsInTimelineOrder(), timelineController)
+                                navigator.forwardEvents(timelineState.selectedEventIdsInTimelineOrder())
                             }
                         }
-                        timelineState.eventSink(TimelineEvent.ExitSelectionMode)
                     }
                 }
                 is MessagesEvent.ConfirmRedact -> {
@@ -432,7 +432,7 @@ class MessagesPresenter(
                 if (featureFlagService.isFeatureEnabled(FeatureFlags.MessageMultiSelect)) {
                     timelineState.eventSink(TimelineEvent.EnterSelectionMode(SelectionAction.Forward, eventId))
                 } else {
-                    navigator.forwardEvents(listOf(eventId), timelineController)
+                    navigator.forwardEvents(listOf(eventId))
                 }
             }
             TimelineItemAction.ReportContent -> handleReportAction(targetEvent)
@@ -441,14 +441,13 @@ class MessagesPresenter(
             TimelineItemAction.Unpin -> handleUnpinAction(targetEvent)
             TimelineItemAction.ViewInTimeline -> Unit
             TimelineItemAction.RetrySending -> handleRetrySending(targetEvent)
+            TimelineItemAction.AbortSending -> handleActionAbortSend(targetEvent)
         }
     }
 
     private suspend fun handleRetrySending(targetEvent: TimelineItem.Event) {
-        val sendHandle = targetEvent.sendhandle ?: return Unit.also {
-            Timber.w("No send handle for event ${targetEvent.eventOrTransactionId}")
-        }
-        sendHandle.retry()
+        val (sendTarget, _) = targetEvent.pendingSend() ?: return
+        timelineController.retrySend(targetEvent.eventOrTransactionId, sendTarget)
             .onSuccess {
                 Timber.d("Succeed to add the message back to the send queue")
             }
@@ -538,11 +537,16 @@ class MessagesPresenter(
     private suspend fun handleActionRedact(event: TimelineItem.Event, redactEventAction: MutableState<AsyncAction<Unit>>) {
         val eventId = event.eventId
         if (eventId == null) {
-            // The message was never sent, so there is nobody to give a reason to.
-            redact(event.eventOrTransactionId, reason = null)
+            // The message (or its edit/redaction) was never sent, just remove it from the send queue.
+            handleActionAbortSend(event)
         } else {
             redactEventAction.value = MessagesState.ConfirmingRedaction(eventId)
         }
+    }
+
+    private suspend fun handleActionAbortSend(event: TimelineItem.Event) {
+        val sendTarget = event.pendingSend()?.first ?: SendTarget.Event
+        timelineController.abortSend(event.eventOrTransactionId, sendTarget).onFailure { Timber.e(it) }
     }
 
     private suspend fun redact(eventOrTransactionId: EventOrTransactionId, reason: String?) {

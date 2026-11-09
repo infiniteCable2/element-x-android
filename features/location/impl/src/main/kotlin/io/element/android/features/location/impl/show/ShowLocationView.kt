@@ -38,6 +38,7 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.features.location.api.internal.rememberTileStyleUrl
+import io.element.android.features.location.impl.R
 import io.element.android.features.location.impl.common.MapDefaults
 import io.element.android.features.location.impl.common.ui.LocationConstraintsDialog
 import io.element.android.features.location.impl.common.ui.LocationFloatingActionButton
@@ -51,7 +52,6 @@ import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.components.Text
 import io.element.android.libraries.designsystem.theme.components.TopAppBar
-import io.element.android.libraries.ui.strings.CommonStrings
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 import org.maplibre.compose.camera.CameraAnimation
@@ -102,7 +102,7 @@ private fun ShowLocationViewContent(
     onBackClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tileStyleUrl = rememberTileStyleUrl(state.customMapTilerConfig.dataOrNull())
+    val tileStyleUrl = rememberTileStyleUrl(state.mapTilerConfig)
     val mapState = rememberMapState(
         baseStyle = BaseStyle.Uri(tileStyleUrl),
         initialCameraPosition = MapDefaults.defaultCameraPosition,
@@ -125,14 +125,14 @@ private fun ShowLocationViewContent(
         if (state.focusedLocation != null && !hasAnimatedToFocusedLocation) {
             hasAnimatedToFocusedLocation = true
             val position = CameraPosition(
-                target = Position(latitude = state.focusedLocation.location.lat, longitude = state.focusedLocation.location.lon),
+                center = Position(latitude = state.focusedLocation.location.lat, longitude = state.focusedLocation.location.lon),
                 zoom = MapDefaults.DEFAULT_ZOOM
             )
             mapState.setCameraPosition(position)
         }
     }
     LaunchedEffect(mapState.isCameraMoving) {
-        if (mapState.cameraMoveReason == CameraMoveReason.GESTURE) {
+        if (mapState.cameraMoveReason == CameraMoveReason.Gesture) {
             state.eventSink(ShowLocationEvent.TrackMyLocation(false))
         }
     }
@@ -144,13 +144,13 @@ private fun ShowLocationViewContent(
         onLocationShareClick = { locationShare ->
             state.eventSink(ShowLocationEvent.TrackMyLocation(false))
             val position = CameraPosition(
-                target = Position(locationShare.location.lon, locationShare.location.lat),
+                center = Position(locationShare.location.lon, locationShare.location.lat),
                 // Force pointing to NORTH
                 bearing = 0.0,
                 zoom = mapState.cameraPosition.zoom.coerceAtLeast(MapDefaults.DEFAULT_ZOOM),
             )
             coroutineScope.launch {
-                mapState.animateCamera(update = position.toCameraUpdate(), animation = CameraAnimation.Fly())
+                mapState.animateCamera(update = position.toCameraUpdate(), animation = CameraAnimation.Fly.Standard)
             }
         },
         modifier = modifier,
@@ -178,7 +178,7 @@ private fun ShowLocationScaffold(
         }
     }
     MapBottomSheetScaffold(
-        isReady = state.customMapTilerConfig.isReady(),
+        isReady = state.mapTilerConfig != null,
         sheetDragHandle = if (state.isSheetDraggable) {
             { BottomSheetDefaults.DragHandle() }
         } else {
@@ -190,7 +190,7 @@ private fun ShowLocationScaffold(
         modifier = modifier,
         topBar = {
             TopAppBar(
-                titleStr = stringResource(CommonStrings.screen_view_location_title),
+                titleStr = stringResource(R.string.screen_view_location_title),
                 navigationIcon = {
                     BackButton(
                         onClick = onBackClick,
@@ -205,7 +205,7 @@ private fun ShowLocationScaffold(
             }
             if (state.locationShares.isEmpty()) {
                 Text(
-                    text = stringResource(CommonStrings.screen_live_location_sheet_nobody_sharing),
+                    text = stringResource(R.string.screen_live_location_sheet_nobody_sharing),
                     style = ElementTheme.typography.fontBodyLgMedium,
                     color = ElementTheme.colors.textPrimary,
                     modifier = Modifier
@@ -215,7 +215,7 @@ private fun ShowLocationScaffold(
                 )
             } else {
                 Text(
-                    text = stringResource(CommonStrings.screen_static_location_sheet_title),
+                    text = stringResource(R.string.screen_static_location_sheet_title),
                     style = ElementTheme.typography.fontBodyLgMedium,
                     color = ElementTheme.colors.textPrimary,
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),

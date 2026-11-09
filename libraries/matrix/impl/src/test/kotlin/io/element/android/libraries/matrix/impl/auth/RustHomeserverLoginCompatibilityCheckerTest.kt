@@ -15,6 +15,8 @@ import io.element.android.libraries.matrix.impl.TestHomeserverConnectionPolicy
 import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClient
 import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClientBuilder
 import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiHomeserverLoginDetails
+import io.element.android.tests.testutils.testCoroutineDispatchers
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
@@ -45,20 +47,42 @@ class RustHomeserverLoginCompatibilityCheckerTest {
 
     @Test
     fun `check rejects another homeserver`() = runTest {
-        val sut = createChecker { FakeFfiHomeserverLoginDetails(supportsOAuthLogin = true) }
+        var builderRequested = false
+        val sut = RustHomeServerLoginCompatibilityChecker(
+            clientBuilderProvider = FakeClientBuilderProvider {
+                builderRequested = true
+                FakeFfiClientBuilder()
+            },
+            coroutineDispatchers = testCoroutineDispatchers(),
+        ).also { it.homeserverConnectionPolicy = TestHomeserverConnectionPolicy }
         assertThat(sut.check("https://other.example").isFailure).isTrue()
+        assertThat(builderRequested).isFalse()
     }
 
-    private fun createChecker(
+    @Test
+    fun `check rejects a resolved homeserver before reading login methods`() = runTest {
+        var loginDetailsRequested = false
+        val sut = createChecker(resolvedHomeserver = "https://other.example") {
+            loginDetailsRequested = true
+            FakeFfiHomeserverLoginDetails(supportsOAuthLogin = true)
+        }
+
+        assertThat(sut.check(TEST_HOMESERVER_URL).isFailure).isTrue()
+        assertThat(loginDetailsRequested).isFalse()
+    }
+
+    private fun TestScope.createChecker(
+        resolvedHomeserver: String = TEST_HOMESERVER_URL,
         result: () -> FakeFfiHomeserverLoginDetails,
     ) = RustHomeServerLoginCompatibilityChecker(
         clientBuilderProvider = FakeClientBuilderProvider {
             FakeFfiClientBuilder {
                 FakeFfiClient(
-                    homeserver = TEST_HOMESERVER_URL,
+                    homeserver = resolvedHomeserver,
                     homeserverLoginDetailsResult = result,
                 )
             }
         },
+        coroutineDispatchers = testCoroutineDispatchers(),
     ).also { it.homeserverConnectionPolicy = TestHomeserverConnectionPolicy }
 }

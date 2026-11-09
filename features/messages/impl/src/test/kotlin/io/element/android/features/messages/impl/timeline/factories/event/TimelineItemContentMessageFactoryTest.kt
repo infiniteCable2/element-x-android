@@ -34,8 +34,9 @@ import io.element.android.features.messages.impl.timeline.model.event.TimelineIt
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemTextContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVideoContent
 import io.element.android.features.messages.impl.timeline.model.event.TimelineItemVoiceContent
-import io.element.android.features.messages.impl.utils.FakeTextPillificationHelper
+import io.element.android.features.messages.impl.timeline.model.event.captionTreeOrNull
 import io.element.android.features.messages.test.timeline.FakeHtmlConverterProvider
+import io.element.android.features.messages.test.timeline.FakeTextPillificator
 import io.element.android.libraries.androidutils.filesize.FakeFileSizeFormatter
 import io.element.android.libraries.core.mimetype.MimeTypes
 import io.element.android.libraries.featureflag.api.FeatureFlags
@@ -1256,6 +1257,45 @@ class TimelineItemContentMessageFactoryTest : RobolectricTest() {
         assertThat((resultWithoutFeatureFlag as TimelineItemTextBasedContent).messageTree).isNull()
     }
 
+    @Test
+    fun `test create will only parse the caption with the new parser if the feature flag is enabled`() = runTest {
+        val featureFlagService = FakeFeatureFlagService(
+            initialState = mapOf(
+                FeatureFlags.NewTimelineEventRenderer.key to true
+            )
+        )
+        val sut = createTimelineItemContentMessageFactory(
+            featureFlagService = featureFlagService
+        )
+        val messageType = ImageMessageType(
+            filename = "filename",
+            caption = "caption",
+            formattedCaption = FormattedBody(MessageFormat.HTML, "<b>caption</b>"),
+            source = MediaSource("url"),
+            info = null,
+        )
+        val resultWithFeatureFlag = sut.create(
+            content = createMessageContent(type = messageType),
+            senderId = A_USER_ID,
+            senderProfile = aProfileDetails(),
+            eventId = AN_EVENT_ID,
+        )
+
+        // The caption tree is present when the feature flag is enabled
+        assertThat(resultWithFeatureFlag.captionTreeOrNull()).isNotNull()
+
+        featureFlagService.setFeatureEnabled(FeatureFlags.NewTimelineEventRenderer, false)
+        val resultWithoutFeatureFlag = sut.create(
+            content = createMessageContent(type = messageType),
+            senderId = A_USER_ID,
+            senderProfile = aProfileDetails(),
+            eventId = AN_EVENT_ID,
+        )
+
+        // The caption tree is null when the feature flag is disabled
+        assertThat(resultWithoutFeatureFlag.captionTreeOrNull()).isNull()
+    }
+
     private fun createMessageContent(
         body: String = "Body",
         inReplyTo: InReplyTo? = null,
@@ -1282,7 +1322,7 @@ class TimelineItemContentMessageFactoryTest : RobolectricTest() {
         fileExtensionExtractor = FileExtensionExtractorWithoutValidation(),
         htmlConverterProvider = FakeHtmlConverterProvider(htmlConverterTransform, domConverterTransform),
         permalinkParser = permalinkParser,
-        textPillificationHelper = FakeTextPillificationHelper(),
+        textPillificator = FakeTextPillificator(),
         htmlMessageParser = FakeHtmlMessageParser(parseResult = { DocumentNode(persistentListOf()) }),
         featureFlagService = featureFlagService,
     )

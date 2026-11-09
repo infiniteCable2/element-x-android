@@ -12,10 +12,9 @@ import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatch
 import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.room.CurrentUserMembership
 import io.element.android.libraries.matrix.api.room.RoomMembershipObserver
-import io.element.android.libraries.matrix.api.roomlist.RoomListService
 import io.element.android.libraries.matrix.test.A_ROOM_ID
 import io.element.android.libraries.matrix.test.A_SESSION_ID
-import io.element.android.libraries.matrix.test.roomlist.FakeRoomListService
+import io.element.android.libraries.matrix.test.FakeMatrixClient
 import io.element.android.libraries.push.test.notifications.FakeNotificationCleaner
 import io.element.android.tests.testutils.lambda.lambdaRecorder
 import io.element.android.tests.testutils.lambda.value
@@ -155,24 +154,24 @@ class LoggedInEventProcessorTest {
     }
 
     @Test
-    fun `test notifications are cleared when room list service state is running`() = runTest {
+    fun `test notifications are cleared when sync heartbeat is emitted`() = runTest {
         val clearReadNotificationsLambda = lambdaRecorder { _: SessionId -> }
         val snackbarDispatcher = SnackbarDispatcher()
         val notificationCleaner = FakeNotificationCleaner(clearReadRoomsNotificationsLambda = clearReadNotificationsLambda)
-        val roomListService = FakeRoomListService()
+        val matrixClient = FakeMatrixClient()
 
         val loggedInEventProcessor = createLoggedInEventProcessor(
             snackbarDispatcher = snackbarDispatcher,
             notificationCleaner = notificationCleaner,
-            roomListService = roomListService,
+            matrixClient = matrixClient,
         )
 
         loggedInEventProcessor.observeEvents(backgroundScope)
 
         testScheduler.runCurrent()
 
-        // Simulate the room list service state changing to Running
-        roomListService.postState(RoomListService.State.Running)
+        // Simulate a sync heartbeat
+        matrixClient.givenTotalUnreadCount(10)
 
         testScheduler.runCurrent()
 
@@ -183,14 +182,12 @@ class LoggedInEventProcessorTest {
     private fun TestScope.createLoggedInEventProcessor(
         snackbarDispatcher: SnackbarDispatcher,
         roomMembershipObserver: RoomMembershipObserver = RoomMembershipObserver(),
-        sessionId: SessionId = A_SESSION_ID,
-        roomListService: FakeRoomListService = FakeRoomListService(),
+        matrixClient: FakeMatrixClient = FakeMatrixClient(),
         notificationCleaner: FakeNotificationCleaner = FakeNotificationCleaner(),
     ) = LoggedInEventProcessor(
         snackbarDispatcher = snackbarDispatcher,
         roomMembershipObserver = roomMembershipObserver,
-        sessionId = sessionId,
-        roomListService = roomListService,
+        matrixClient = matrixClient,
         notificationCleaner = notificationCleaner,
         dispatchers = testCoroutineDispatchers(),
     )

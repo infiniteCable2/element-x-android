@@ -25,6 +25,7 @@ import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.ui.components.aMatrixUser
 import io.element.android.libraries.matrix.ui.components.aSelectRoomInfo
+import io.element.android.libraries.matrix.ui.components.switchaccount.anOtherAccount
 import io.element.android.libraries.roomselect.api.RoomSelectMode
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.tests.testutils.EnsureNeverCalled
@@ -84,6 +85,43 @@ class RoomSelectViewTest : RobolectricTest() {
         onNodeWithText("@alice:example.org").assertDoesNotExist()
     }
 
+    @Config(qualifiers = "h1024dp")
+    @Test
+    fun `the suggestions are rendered above the room list`() = runAndroidComposeUiTest {
+        setRoomSelectView(
+            aRoomSelectState(
+                resultState = SearchBarResultState.Results(aRoomSelectRoomList()),
+                suggestions = persistentListOf(
+                    aSelectRoomInfo(roomId = RoomId("!suggested:domain"), name = "Suggested room"),
+                ),
+            ),
+        )
+        onNodeWithText("Suggested room").assertIsDisplayed()
+        onNodeWithText(activity!!.getString(CommonStrings.common_suggestions)).assertIsDisplayed()
+    }
+
+    @Config(qualifiers = "h1024dp")
+    @Test
+    fun `clicking on a suggested room emits the expected event`() = runAndroidComposeUiTest {
+        val eventsRecorder = EventsRecorder<RoomSelectEvent>()
+        val suggestion = aSelectRoomInfo(roomId = RoomId("!suggested:domain"), name = "Suggested room")
+        setRoomSelectView(
+            aRoomSelectState(
+                resultState = SearchBarResultState.Results(aRoomSelectRoomList()),
+                suggestions = persistentListOf(suggestion),
+                eventSink = eventsRecorder,
+            ),
+        )
+        onNodeWithText("Suggested room").performClick()
+        eventsRecorder.assertList(
+            listOf(
+                // 1 suggestion + 2 section headers are rendered before the room list, so the visible range is shifted by 3
+                RoomSelectEvent.UpdateVisibleRange(0..3),
+                RoomSelectEvent.ToggleSelectedRoom(suggestion),
+            )
+        )
+    }
+
     @Test
     fun `clicking on switch account emits the expected event`() = runAndroidComposeUiTest {
         val eventsRecorder = EventsRecorder<RoomSelectEvent>()
@@ -91,11 +129,11 @@ class RoomSelectViewTest : RobolectricTest() {
             aRoomSelectState(
                 mode = RoomSelectMode.Share,
                 selectedAccount = aMatrixUser(id = "@alice:example.org", displayName = "Alice"),
-                otherAccounts = persistentListOf(aMatrixUser(id = "@bob:example.org", displayName = "Bob")),
+                otherAccounts = persistentListOf(anOtherAccount(aMatrixUser(id = "@bob:example.org", displayName = "Bob"))),
                 eventSink = eventsRecorder,
             ),
         )
-        clickOn(CommonStrings.common_switch_account)
+        clickOn(CommonStrings.common_switch_accounts)
         // The first event is the initial UpdateVisibleRange
         eventsRecorder.assertList(listOf(RoomSelectEvent.UpdateVisibleRange(0..-1), RoomSelectEvent.ToggleAccountListExpanded))
     }
@@ -107,7 +145,7 @@ class RoomSelectViewTest : RobolectricTest() {
             aRoomSelectState(
                 mode = RoomSelectMode.Share,
                 selectedAccount = aMatrixUser(id = "@alice:example.org", displayName = "Alice"),
-                otherAccounts = persistentListOf(aMatrixUser(id = "@bob:example.org", displayName = "Bob")),
+                otherAccounts = persistentListOf(anOtherAccount(aMatrixUser(id = "@bob:example.org", displayName = "Bob"))),
                 isAccountListExpanded = true,
                 eventSink = eventsRecorder,
             ),
@@ -125,7 +163,7 @@ class RoomSelectViewTest : RobolectricTest() {
                 selectedAccount = aMatrixUser(id = "@alice:example.org", displayName = "Alice"),
             ),
         )
-        onNodeWithText(activity!!.getString(CommonStrings.common_switch_account)).assertDoesNotExist()
+        onNodeWithText(activity!!.getString(CommonStrings.common_switch_accounts)).assertDoesNotExist()
     }
 
     @Test
@@ -147,12 +185,23 @@ class RoomSelectViewTest : RobolectricTest() {
             aRoomSelectState(
                 mode = RoomSelectMode.Share,
                 resultState = SearchBarResultState.Results(aLongRoomList()),
-                otherAccounts = persistentListOf(aMatrixUser(id = "@bob:example.org", displayName = "Bob")),
+                otherAccounts = persistentListOf(anOtherAccount(aMatrixUser(id = "@bob:example.org", displayName = "Bob"))),
             ),
         )
         onNodeWithText("Room 0").assertIsDisplayed()
         onRoot().performTouchInput { swipeUp() }
         onNodeWithText("Room 0").assertIsNotDisplayed()
+    }
+
+    @Test
+    fun `a message is displayed when no room matches the search query`() = runAndroidComposeUiTest {
+        setRoomSelectView(
+            aRoomSelectState(
+                searchQuery = "Test",
+                resultState = SearchBarResultState.NoResultsFound,
+            ),
+        )
+        onNodeWithText(activity!!.getString(CommonStrings.common_no_results)).assertIsDisplayed()
     }
 
     @Test

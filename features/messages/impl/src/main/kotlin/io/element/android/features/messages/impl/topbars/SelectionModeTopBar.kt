@@ -12,9 +12,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.tooling.preview.PreviewParameterProvider
 import io.element.android.compound.tokens.generated.CompoundIcons
+import io.element.android.features.messages.impl.R
 import io.element.android.features.messages.impl.timeline.SelectionAction
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
@@ -34,10 +40,18 @@ fun SelectionModeTopBar(
     onConfirmClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val a11ySelectedCount = pluralStringResource(R.plurals.screen_room_selection_count, selectedCount, selectedCount)
     TopAppBar(
         modifier = modifier,
         title = {
-            Text(text = pluralStringResource(CommonPlurals.common_selected_count, selectedCount, selectedCount))
+            Text(
+                text = pluralStringResource(CommonPlurals.common_selected_count, selectedCount, selectedCount),
+                modifier = Modifier.semantics {
+                    heading()
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = a11ySelectedCount
+                },
+            )
         },
         navigationIcon = {
             IconButton(

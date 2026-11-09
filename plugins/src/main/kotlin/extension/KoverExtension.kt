@@ -39,13 +39,11 @@ val excludedKoverSubProjects = listOf(
     ":tests:testutils",
     // Exclude modules which are not Android libraries
     // See https://github.com/Kotlin/kotlinx-kover/issues/312
-    ":appconfig",
     ":libraries:core",
     ":libraries:coroutines",
     ":libraries:di",
     ":tests:detekt-rules",
     ":tests:konsist",
-    ":tests:testutils",
 ) + localAarProjects
 
 private fun Project.kover(any: Any) {
@@ -77,9 +75,9 @@ fun Project.setupKover() {
 
                     // Using the cache for coverage verification seems to be flaky, so we disable it for now.
                     val taskName = "koverCachedVerify${variant.replaceFirstChar(Char::titlecase)}"
-                    val cachedTask = project.tasks.findByName(taskName)
-                    cachedTask?.let {
-                        it.outputs.upToDateWhen { false }
+                    // Configure it lazily: the task may not be registered yet, and `findByName` would also create it eagerly.
+                    project.tasks.named { it == taskName }.configureEach {
+                        outputs.upToDateWhen { false }
                     }
                 }
             }

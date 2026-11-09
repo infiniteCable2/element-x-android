@@ -12,30 +12,35 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.appconfig.HomeserverConnectionPolicy
 import io.element.android.appconfig.LockedHomeserverPolicy
+import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.core.extensions.runCatchingExceptions
 import io.element.android.libraries.matrix.api.auth.HomeServerLoginCompatibilityChecker
 import io.element.android.libraries.matrix.impl.ClientBuilderProvider
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 @ContributesBinding(AppScope::class)
 class RustHomeServerLoginCompatibilityChecker(
     private val clientBuilderProvider: ClientBuilderProvider,
-    ) : HomeServerLoginCompatibilityChecker {
+    private val coroutineDispatchers: CoroutineDispatchers,
+) : HomeServerLoginCompatibilityChecker {
     internal var homeserverConnectionPolicy: HomeserverConnectionPolicy = LockedHomeserverPolicy
 
-    override suspend fun check(url: String): Result<Boolean> = runCatchingExceptions {
-        homeserverConnectionPolicy.requireAllowed(url)
-        clientBuilderProvider.provide()
-            .inMemoryStore()
-            .serverNameOrHomeserverUrl(url)
-            .build()
-            .use {
-                homeserverConnectionPolicy.requireAllowed(it.homeserver())
-                it.homeserverLoginDetails()
-            }
-            .use {
-                Timber.d("Homeserver $url | OAuth: ${it.supportsOauthLogin()} | Password: ${it.supportsPasswordLogin()} | SSO: ${it.supportsSsoLogin()}")
-                it.supportsOauthLogin() || it.supportsPasswordLogin()
-            }
+    override suspend fun check(url: String): Result<Boolean> = withContext(coroutineDispatchers.io) {
+        runCatchingExceptions {
+            homeserverConnectionPolicy.requireAllowed(url)
+            clientBuilderProvider.provide()
+                .inMemoryStore()
+                .serverNameOrHomeserverUrl(url)
+                .build()
+                .use {
+                    homeserverConnectionPolicy.requireAllowed(it.homeserver())
+                    it.homeserverLoginDetails()
+                }
+                .use {
+                    Timber.d("Homeserver login methods | OAuth: ${it.supportsOauthLogin()} | Password: ${it.supportsPasswordLogin()} | SSO: ${it.supportsSsoLogin()}")
+                    it.supportsOauthLogin() || it.supportsPasswordLogin()
+                }
+        }
     }
 }

@@ -15,6 +15,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +34,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.SideEffect
@@ -53,19 +56,20 @@ import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.translate
-import androidx.compose.ui.input.pointer.PointerEventTimeoutCancellationException
-import androidx.compose.ui.input.pointer.changedToUp
+import androidx.compose.ui.input.pointer.changedToUpIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.LocalClipboard
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -74,6 +78,7 @@ import androidx.compose.ui.text.style.ResolvedTextDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.libraries.designsystem.components.linkify
@@ -86,6 +91,7 @@ import io.element.android.libraries.htmlrenderer.api.HeaderNode
 import io.element.android.libraries.htmlrenderer.api.HtmlMessageParser.Companion.INLINE_CODE_ANNOTATION_TAG
 import io.element.android.libraries.htmlrenderer.api.HtmlMessageParser.Companion.LINK_ANNOTATION_TAG
 import io.element.android.libraries.htmlrenderer.api.ListNode
+import io.element.android.libraries.htmlrenderer.api.LocalMentionDisplayNames
 import io.element.android.libraries.htmlrenderer.api.MentionNodeContent
 import io.element.android.libraries.htmlrenderer.api.ParagraphNode
 import io.element.android.libraries.htmlrenderer.api.QuoteNode
@@ -314,6 +320,8 @@ private fun CodeBlockView(
             .background(ElementTheme.colors.bgSubtleSecondary)
             .height(IntrinsicSize.Min)
             .combinedClickable(
+                interactionSource = null,
+                indication = ripple(focusRingShape = RoundedCornerShape(8.dp)),
                 onClick = {},
                 onLongClick = {
                     coroutineScope.launch {
@@ -415,7 +423,7 @@ private fun ListView(
 
 @Composable
 private fun MentionPill(
-    mention: MentionNodeContent,
+    displayText: String,
     isCurrentUser: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -427,12 +435,16 @@ private fun MentionPill(
             .fillMaxSize()
             .clip(RoundedCornerShape(percent = 50))
             .background(backgroundColor)
-            .clickable(onClick = onClick)
+            .clickable(
+                interactionSource = null,
+                indication = ripple(focusRingShape = RoundedCornerShape(percent = 50)),
+                onClick = onClick,
+            )
             .padding(horizontal = PillPaddingHorizontal, vertical = PillPaddingVertical),
         contentAlignment = Alignment.Center,
     ) {
         Text(
-            text = mention.displayText,
+            text = displayText,
             style = ElementTheme.typography.fontBodyLgMedium,
             color = textColor,
             maxLines = 1,
@@ -443,6 +455,10 @@ private fun MentionPill(
 /**
  * Builds an [InlineTextContent] entry for each mention placeholder. Each pill is measured so
  * the placeholder reserves exactly the space the pill needs.
+ *
+ * The pill text (display name and user status) is resolved using [LocalMentionDisplayNames], so the pills are measured again
+ * whenever the display name or status of one of the mentioned users or rooms changes. The text sizes are
+ * cached in [PillTextSizeCache], so the same pill text is only measured once for all messages.
  */
 @Composable
 private fun rememberMentionInlineContent(
@@ -453,10 +469,32 @@ private fun rememberMentionInlineContent(
     val textMeasurer = rememberTextMeasurer()
     val pillTextStyle = ElementTheme.typography.fontBodyLgMedium
     val density = LocalDensity.current
-    return mentions.mapValues { (_, mention) ->
-        val measured = textMeasurer.measure(mention.displayText, pillTextStyle)
-        val width = with(density) { measured.size.width.toDp() + PillPaddingHorizontal * 2 }
-        val height = with(density) { measured.size.height.toDp() + PillPaddingVertical * 2 }
+    val layoutDirection = LocalLayoutDirection.current
+    val mentionDisplayNames = LocalMentionDisplayNames.current
+    // Only the display texts of these mentions matter: since `derivedStateOf` only notifies its readers when its value changes,
+    // unrelated display name changes won't recompose this text nor trigger a new measure pass
+    val displayTexts by remember(mentions, mentionDisplayNames) {
+        derivedStateOf { mentions.mapValues { (_, mention) -> mentionDisplayNames.pillTextFor(mention) } }
+    }
+    return remember(mentions, displayTexts, context, textMeasurer, pillTextStyle, density, layoutDirection) {
+        buildMentionInlineContent(mentions, displayTexts, context, textMeasurer, pillTextStyle, density, layoutDirection)
+    }
+}
+
+private fun buildMentionInlineContent(
+    mentions: ImmutableMap<String, MentionNodeContent>,
+    displayTexts: Map<String, String>,
+    context: RenderContext,
+    textMeasurer: TextMeasurer,
+    pillTextStyle: TextStyle,
+    density: Density,
+    layoutDirection: LayoutDirection,
+): ImmutableMap<String, InlineTextContent> {
+    return mentions.mapValues { (id, mention) ->
+        val displayText = displayTexts[id] ?: mention.displayText
+        val textSize = PillTextSizeCache.getOrMeasure(displayText, pillTextStyle, density, layoutDirection, textMeasurer)
+        val width = with(density) { textSize.width.toDp() + PillPaddingHorizontal * 2 }
+        val height = with(density) { textSize.height.toDp() + PillPaddingVertical * 2 }
         InlineTextContent(
             placeholder = Placeholder(
                 width = with(density) { width.toSp() },
@@ -465,7 +503,7 @@ private fun rememberMentionInlineContent(
             ),
         ) {
             MentionPill(
-                mention = mention,
+                displayText = displayText,
                 isCurrentUser = mention is MentionNodeContent.User && mention.userId == context.currentUserId,
                 onClick = { context.onMentionClick(mention) },
             )
@@ -565,34 +603,18 @@ private fun Modifier.linkTapHandler(
         val (url, urlText) = layoutResult.value?.urlAt(down.position, text) ?: return@awaitEachGesture
         down.consume()
 
-        val longPressTimeout = viewConfiguration.longPressTimeoutMillis
-
-        // Try detecting a long press by waiting for the long press timeout and checking if we received an up event before that.
-        // If we did, it's a tap, otherwise it's a long press.
-        // This warning is a false positive.
-        @Suppress("KotlinConstantConditions")
-        val isLongPress = try {
-            withTimeout(longPressTimeout) {
-                var receivedUp = false
-                while (!receivedUp) {
-                    val event = awaitPointerEvent()
-                    val up = event.changes.firstOrNull { it.id == down.id && it.changedToUp() }
-                    if (up != null) {
-                        receivedUp = true
-                        up.consume()
-                    }
-                }
-
-                !receivedUp
-            }
-        } catch (_: PointerEventTimeoutCancellationException) {
-            true
-        }
-
-        if (isLongPress) {
+        // Returns a non-null change if the long press timeout elapsed, or null if the gesture was canceled by movement beyond touch slop or by an up event.
+        if (awaitLongPressOrCancellation(down.id) != null) {
             context.onLinkLongClick(url, urlText)
+            // Swallow the rest of the gesture so parents don't react to the eventual release.
+            waitForUpOrCancellation()?.consume()
         } else {
-            context.onLinkClick(url, urlText)
+            // Either a tap (the pointer was released) or a drag (the user probably wanted to scroll).
+            val up = currentEvent.changes.firstOrNull { it.id == down.id && it.changedToUpIgnoreConsumed() }
+            if (up != null) {
+                up.consume()
+                context.onLinkClick(url, urlText)
+            }
         }
     }
 }

@@ -16,11 +16,14 @@ import androidx.startup.AppInitializer
 import androidx.work.Configuration
 import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.createGraphFactory
+import io.element.android.call.ui.ElementCallActivity
 import io.element.android.libraries.appupdater.api.AppUpdater
 import io.element.android.libraries.architecture.bindings
 import io.element.android.libraries.di.DependencyInjectionGraphOwner
 import io.element.android.libraries.matrix.api.SdkMetadata
 import io.element.android.libraries.workmanager.api.di.MetroWorkerFactory
+import io.element.android.x.call.ElementCallActivityHostDelegate
+import io.element.android.x.di.AppBindings
 import io.element.android.x.di.AppGraph
 import io.element.android.x.di.ApplicationBindings
 import io.element.android.x.info.logApplicationInfo
@@ -28,7 +31,16 @@ import io.element.android.x.initializer.CacheCleanerInitializer
 import io.element.android.x.initializer.CrashInitializer
 import io.element.android.x.initializer.PlatformInitializer
 
-class ElementXApplication : Application(), DependencyInjectionGraphOwner, Configuration.Provider {
+// The private constructor is there so the native call screen's host can be a delegate: Android instantiates
+// the Application through the public no-arg one.
+class ElementXApplication private constructor(
+    private val elementCallActivityHost: ElementCallActivityHostDelegate,
+) : Application(),
+    DependencyInjectionGraphOwner,
+    Configuration.Provider,
+    ElementCallActivity.Host by elementCallActivityHost {
+    constructor() : this(ElementCallActivityHostDelegate())
+
     override val graph: AppGraph = createGraphFactory<AppGraph.Factory>().create(this)
 
     override val workManagerConfiguration: Configuration = Configuration.Builder()
@@ -51,6 +63,7 @@ class ElementXApplication : Application(), DependencyInjectionGraphOwner, Config
         }
 
         bindings<ApplicationBindings>().inject(this)
+        elementCallActivityHost.bind { bindings<AppBindings>().nativeCallScreenHost() }
         logApplicationInfo(this, sdkMetadata.sdkGitSha)
         appUpdater.checkInBackground()
 

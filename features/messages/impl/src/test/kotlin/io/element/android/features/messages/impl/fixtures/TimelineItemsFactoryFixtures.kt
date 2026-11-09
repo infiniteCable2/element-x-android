@@ -26,8 +26,8 @@ import io.element.android.features.messages.impl.timeline.factories.event.Timeli
 import io.element.android.features.messages.impl.timeline.factories.virtual.TimelineItemDaySeparatorFactory
 import io.element.android.features.messages.impl.timeline.factories.virtual.TimelineItemVirtualFactory
 import io.element.android.features.messages.impl.timeline.groups.TimelineItemGrouper
-import io.element.android.features.messages.impl.utils.FakeTextPillificationHelper
 import io.element.android.features.messages.test.timeline.FakeHtmlConverterProvider
+import io.element.android.features.messages.test.timeline.FakeTextPillificator
 import io.element.android.features.poll.test.pollcontent.FakePollContentStateFactory
 import io.element.android.libraries.androidutils.filesize.FakeFileSizeFormatter
 import io.element.android.libraries.dateformatter.test.FakeDateFormatter
@@ -60,7 +60,7 @@ internal fun aTimelineItemContentFactory(
         fileExtensionExtractor = FileExtensionExtractorWithoutValidation(),
         htmlConverterProvider = FakeHtmlConverterProvider(),
         permalinkParser = FakePermalinkParser(),
-        textPillificationHelper = FakeTextPillificationHelper(),
+        textPillificator = FakeTextPillificator(),
         htmlMessageParser = FakeHtmlMessageParser(),
         featureFlagService = FakeFeatureFlagService(),
     ),
@@ -90,7 +90,9 @@ internal fun TestScope.aTimelineItemsFactory(
         eventItemFactoryCreator = object : TimelineItemEventFactory.Creator {
             override fun create(config: TimelineItemsFactoryConfig): TimelineItemEventFactory {
                 return TimelineItemEventFactory(
-                    contentFactory = aTimelineItemContentFactory(matrixClient = matrixClient),
+                    contentFactory = aTimelineItemContentFactory(
+                        matrixClient = matrixClient,
+                    ),
                     matrixClient = matrixClient,
                     dateFormatter = FakeDateFormatter(),
                     permalinkParser = FakePermalinkParser(),

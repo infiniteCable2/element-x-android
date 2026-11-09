@@ -8,7 +8,10 @@
 package io.element.android.libraries.matrix.impl
 
 import com.google.common.truth.Truth.assertThat
+import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClient
+import io.element.android.libraries.matrix.impl.fixtures.fakes.FakeFfiClientBuilder
 import io.element.android.libraries.matrix.impl.paths.SessionPathsFactory
+import io.element.android.tests.testutils.testCoroutineDispatchers
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -24,9 +27,38 @@ class RustTemporaryMatrixClientFactoryTest {
 
     @Test
     fun `create rejects another homeserver before building a client`() = runTest {
-        val sut = createRustTemporaryMatrixClientFactory()
+        var builderRequested = false
+        val sut = createRustTemporaryMatrixClientFactory(
+            rustMatrixClientFactory = createRustMatrixClientFactory(
+                clientBuilderProvider = FakeClientBuilderProvider {
+                    builderRequested = true
+                    FakeFfiClientBuilder()
+                },
+            ),
+        )
         val result = sut.create("https://other.example")
         assertThat(result.isFailure).isTrue()
+        assertThat(builderRequested).isFalse()
+    }
+
+    @Test
+    fun `create rejects and closes a client resolved to another homeserver`() = runTest {
+        var clientClosed = false
+        val sut = createRustTemporaryMatrixClientFactory(
+            rustMatrixClientFactory = createRustMatrixClientFactory(
+                clientBuilderProvider = FakeClientBuilderProvider {
+                    FakeFfiClientBuilder {
+                        FakeFfiClient(
+                            homeserver = "https://other.example",
+                            closeResult = { clientClosed = true },
+                        )
+                    }
+                },
+            ),
+        )
+
+        assertThat(sut.create(TEST_HOMESERVER_URL).isFailure).isTrue()
+        assertThat(clientClosed).isTrue()
     }
 
     @Test
@@ -49,6 +81,7 @@ class RustTemporaryMatrixClientFactoryTest {
         return RustTemporaryMatrixClientFactory(
             sessionPathsFactory = sessionPathsFactory,
             rustMatrixClientFactory = rustMatrixClientFactory,
+            coroutineDispatchers = testCoroutineDispatchers(),
         ).also { it.homeserverConnectionPolicy = TestHomeserverConnectionPolicy }
     }
 }

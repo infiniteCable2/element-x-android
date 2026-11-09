@@ -130,7 +130,7 @@ private fun ShareLocationViewContent(
     navigateUp: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val tileStyleUrl = rememberTileStyleUrl(state.customMapTilerConfig.dataOrNull())
+    val tileStyleUrl = rememberTileStyleUrl(state.mapTilerConfig)
     val mapState = rememberMapState(
         baseStyle = BaseStyle.Uri(tileStyleUrl),
         initialCameraPosition = MapDefaults.defaultCameraPosition,
@@ -143,7 +143,7 @@ private fun ShareLocationViewContent(
         enabled = state.trackUserLocation,
     )
     LaunchedEffect(mapState.isCameraMoving) {
-        if (mapState.cameraMoveReason == CameraMoveReason.GESTURE) {
+        if (mapState.cameraMoveReason == CameraMoveReason.Gesture) {
             state.eventSink(ShareLocationEvent.StopTrackingUserLocation)
         }
     }
@@ -152,7 +152,7 @@ private fun ShareLocationViewContent(
         mapState = mapState,
         navigateUp = navigateUp,
         onSharePinLocation = {
-            val positionTarget = mapState.cameraPosition.target
+            val positionTarget = mapState.cameraPosition.center
             state.eventSink(
                 ShareLocationEvent.ShareStaticLocation(
                     location = Location(lat = positionTarget.latitude, lon = positionTarget.longitude),
@@ -181,7 +181,7 @@ private fun ShareLocationScaffold(
         )
     )
     MapBottomSheetScaffold(
-        isReady = state.customMapTilerConfig.isReady(),
+        isReady = state.mapTilerConfig != null,
         mapState = mapState,
         modifier = modifier,
         scaffoldState = scaffoldState,
@@ -189,7 +189,7 @@ private fun ShareLocationScaffold(
         sheetSwipeEnabled = false,
         topBar = {
             TopAppBar(
-                titleStr = stringResource(CommonStrings.screen_share_location_title),
+                titleStr = stringResource(R.string.screen_share_location_title),
                 navigationIcon = {
                     BackButton(onClick = navigateUp)
                 },
@@ -297,7 +297,7 @@ private fun ShareCurrentLocationItem(
 ) {
     ListItem(
         content = {
-            Text(stringResource(CommonStrings.screen_share_my_location_action))
+            Text(stringResource(R.string.screen_share_my_location_action))
         },
         onClick = onClick,
         leadingContent = ListItemContent.Icon(
@@ -312,7 +312,7 @@ private fun SharePinLocationItem(
 ) {
     ListItem(
         content = {
-            Text(stringResource(CommonStrings.screen_share_this_location_action))
+            Text(stringResource(R.string.screen_share_this_location_action))
         },
         onClick = onClick,
         leadingContent = ListItemContent.Icon(

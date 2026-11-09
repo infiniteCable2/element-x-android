@@ -22,9 +22,11 @@ import androidx.compose.ui.test.v2.runAndroidComposeUiTest
 import io.element.android.features.preferences.impl.R
 import io.element.android.libraries.appupdater.api.AppUpdateState
 import io.element.android.libraries.emoji.api.picker.NoOpEmojiPickerRenderer
+import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.user.MatrixUser
 import io.element.android.libraries.matrix.test.A_USER_ID_2
 import io.element.android.libraries.matrix.ui.components.aMatrixUser
+import io.element.android.libraries.matrix.ui.components.switchaccount.anOtherAccount
 import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.tests.testutils.EnsureNeverCalled
 import io.element.android.tests.testutils.EnsureNeverCalledWithParam
@@ -71,23 +73,49 @@ class PreferencesRootViewTest : RobolectricTest() {
     }
 
     @Test
-    fun `clicking on other session sends a SwitchToSession`() = runAndroidComposeUiTest {
-        val eventsRecorder = EventsRecorder<PreferencesRootEvent>()
+    fun `clicking on other session invokes the expected callback`() = runAndroidComposeUiTest {
+        val eventsRecorder = EventsRecorder<PreferencesRootEvent>(expectEvents = false)
+        ensureCalledOnceWithParam(A_USER_ID_2) { callback ->
+            setView(
+                aPreferencesRootState(
+                    isMultiAccountEnabled = true,
+                    isOtherAccountsSectionExpanded = true,
+                    otherSessions = listOf(
+                        anOtherAccount(
+                            user = aMatrixUser(
+                                id = A_USER_ID_2.value,
+                                displayName = "Bob",
+                            ),
+                        )
+                    ),
+                    eventSink = eventsRecorder,
+                ),
+                onSwitchToSession = callback,
+            )
+            onNodeWithText("Bob").performClick()
+        }
+    }
+
+    @Test
+    fun `unread count of other session is displayed`() = runAndroidComposeUiTest {
+        val eventsRecorder = EventsRecorder<PreferencesRootEvent>(expectEvents = false)
         setView(
             aPreferencesRootState(
                 isMultiAccountEnabled = true,
                 isOtherAccountsSectionExpanded = true,
                 otherSessions = listOf(
-                    aMatrixUser(
-                        id = A_USER_ID_2.value,
-                        displayName = "Bob",
+                    anOtherAccount(
+                        user = aMatrixUser(
+                            id = A_USER_ID_2.value,
+                            displayName = "Bob",
+                        ),
+                        unreadCount = 42,
                     )
                 ),
                 eventSink = eventsRecorder,
             ),
         )
-        onNodeWithText("Bob").performClick()
-        eventsRecorder.assertSingle(PreferencesRootEvent.SwitchToSession(A_USER_ID_2))
+        onNodeWithText("42").assertExists()
     }
 
     @Test
@@ -98,15 +126,17 @@ class PreferencesRootViewTest : RobolectricTest() {
                 isMultiAccountEnabled = true,
                 isOtherAccountsSectionExpanded = false,
                 otherSessions = listOf(
-                    aMatrixUser(
-                        id = A_USER_ID_2.value,
-                        displayName = "Bob",
+                    anOtherAccount(
+                        user = aMatrixUser(
+                            id = A_USER_ID_2.value,
+                            displayName = "Bob",
+                        ),
                     )
                 ),
                 eventSink = eventsRecorder,
             ),
         )
-        clickOn(CommonStrings.common_switch_account)
+        clickOn(CommonStrings.common_switch_accounts)
         eventsRecorder.assertSingle(PreferencesRootEvent.ToggleOtherAccountsExpanded)
     }
 
@@ -118,15 +148,17 @@ class PreferencesRootViewTest : RobolectricTest() {
                 isMultiAccountEnabled = true,
                 isOtherAccountsSectionExpanded = false,
                 otherSessions = listOf(
-                    aMatrixUser(
-                        id = A_USER_ID_2.value,
-                        displayName = "Bob",
+                    anOtherAccount(
+                        user = aMatrixUser(
+                            id = A_USER_ID_2.value,
+                            displayName = "Bob",
+                        ),
                     )
                 ),
                 eventSink = eventsRecorder,
             ),
         )
-        assertNodeWithTextIsDisplayed(CommonStrings.common_switch_account)
+        assertNodeWithTextIsDisplayed(CommonStrings.common_switch_accounts)
         onNodeWithText("Bob").assertDoesNotExist()
         assertNoNodeWithText(CommonStrings.common_add_another_account)
     }
@@ -140,9 +172,11 @@ class PreferencesRootViewTest : RobolectricTest() {
                     isMultiAccountEnabled = true,
                     isOtherAccountsSectionExpanded = true,
                     otherSessions = listOf(
-                        aMatrixUser(
-                            id = A_USER_ID_2.value,
-                            displayName = "Bob",
+                        anOtherAccount(
+                            user = aMatrixUser(
+                                id = A_USER_ID_2.value,
+                                displayName = "Bob",
+                            ),
                         )
                     ),
                     eventSink = eventsRecorder,
@@ -421,6 +455,7 @@ private fun AndroidComposeUiTest<ComponentActivity>.setView(
     state: PreferencesRootState,
     onBackClick: () -> Unit = EnsureNeverCalled(),
     onAddAccountClick: () -> Unit = EnsureNeverCalled(),
+    onSwitchToSession: (SessionId) -> Unit = EnsureNeverCalledWithParam(),
     onOpenAnalytics: () -> Unit = EnsureNeverCalled(),
     onOpenLockScreenSettings: () -> Unit = EnsureNeverCalled(),
     onOpenAbout: () -> Unit = EnsureNeverCalled(),
@@ -444,6 +479,7 @@ private fun AndroidComposeUiTest<ComponentActivity>.setView(
             emojiPickerRenderer = NoOpEmojiPickerRenderer,
             onBackClick = onBackClick,
             onAddAccountClick = onAddAccountClick,
+            onSwitchToSession = onSwitchToSession,
             onOpenAnalytics = onOpenAnalytics,
             onOpenLockScreenSettings = onOpenLockScreenSettings,
             onOpenAbout = onOpenAbout,

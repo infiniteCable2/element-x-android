@@ -45,6 +45,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -188,10 +189,13 @@ fun TimelineView(
     val isSelectionModeActive = state.isSelectionModeActive
     // Animate once here (shared by every row) rather than per-row: the value is identical for all
     // rows since it only depends on the timeline-wide selection mode.
-    val selectionProgress by animateFloatAsState(
+    val selectionProgress = animateFloatAsState(
         targetValue = if (isSelectionModeActive) 1f else 0f,
         label = "selectionProgress",
     )
+    // Hand the rows a reader rather than the value: they read it when they lay out and draw, so a frame of the animation does not recompose every
+    // visible row, and the slide cannot desynchronise from the indicator.
+    val selectionProgressProvider = remember(selectionProgress) { { selectionProgress.value } }
     fun onToggleSelection(event: TimelineItem.Event) {
         val eventId = event.eventId ?: return
         state.eventSink(TimelineEvent.ToggleSelection(eventId))
@@ -231,7 +235,7 @@ fun TimelineView(
                             displayThreadSummaries = state.displayThreadSummaries,
                             selectionData = TimelineItemSelectionData(
                                 isSelectionModeActive = isSelectionModeActive,
-                                progress = selectionProgress,
+                                progress = selectionProgressProvider,
                                 isSelected = state.isSelected(timelineItem),
                                 canBeSelected = state.canSelect(timelineItem),
                             ),
@@ -318,7 +322,8 @@ private fun TimelinePrefetchingHelper(
     LaunchedEffect(Unit) {
         // We're using snapshot flows for these because using `LaunchedEffect` with `derivedState` doesn't seem to be responsive enough
         val firstVisibleItemIndexFlow = snapshotFlow { lazyListState.firstVisibleItemIndex }
-        val layoutInfoFlow = snapshotFlow { lazyListState.layoutInfo }
+        val visibleItemsCountFlow = snapshotFlow { lazyListState.layoutInfo.visibleItemsInfo.size }
+        val totalItemsCountFlow = snapshotFlow { lazyListState.layoutInfo.totalItemsCount }
         val isScrollingFlow = snapshotFlow { lazyListState.isScrollInProgress }
             // This value changes too frequently, so we debounce it to avoid unnecessary prefetching. It's the equivalent of a conditional 'throttleLatest'
             .conflate()
@@ -327,13 +332,17 @@ private fun TimelinePrefetchingHelper(
                 if (isScrolling) delay(100.milliseconds)
             }
 
-        val isCloseToStartOfLoadedTimelineFlow = combine(layoutInfoFlow, firstVisibleItemIndexFlow) { layoutInfo, firstVisibleItemIndex ->
-            firstVisibleItemIndex + layoutInfo.visibleItemsInfo.size >= layoutInfo.totalItemsCount - 40
+        val isCloseToStartOfLoadedTimelineFlow = combine(
+            visibleItemsCountFlow,
+            totalItemsCountFlow,
+            firstVisibleItemIndexFlow,
+        ) { visibleItemsCount, totalItemsCount, firstVisibleItemIndex ->
+            firstVisibleItemIndex + visibleItemsCount >= totalItemsCount - 40
         }
 
         // If we have no timeline items, we need to back paginate to load some messages. This usually happens on all timelines except for live ones.
         // This automatic pagination was previously done by the SDK, and we received a `Reset` update, but now we need to do it ourselves.
-        val isEmptyTimelineFlow = layoutInfoFlow.map { it.totalItemsCount == 0 }
+        val isEmptyTimelineFlow = totalItemsCountFlow.map { it == 0 }
 
         combine(
             isCloseToStartOfLoadedTimelineFlow.distinctUntilChanged(),
@@ -521,6 +530,8 @@ private fun JumpToPositionButton(
                     .clip(CircleShape)
                     .border(1.dp, ElementTheme.colors.borderDisabled, CircleShape)
                     .combinedClickable(
+                        interactionSource = null,
+                        indication = ripple(focusRingShape = CircleShape),
                         onClick = onClick,
                         onLongClick = { menuExpanded = true },
                         onLongClickLabel = stringResource(CommonStrings.action_open_context_menu),
@@ -568,7 +579,10 @@ private fun JumpToPositionButton(
                                     .clip(RoundedCornerShape(8.dp))
                                     .background(ElementTheme.colors.bgCanvasDefaultLevel1)
                                     .border(1.dp, ElementTheme.colors.borderDisabled, RoundedCornerShape(8.dp))
-                                    .clickable {
+                                    .clickable(
+                                        interactionSource = null,
+                                        indication = ripple(focusRingShape = RoundedCornerShape(8.dp)),
+                                    ) {
                                         menuExpanded = false
                                         onMarkAsRead()
                                     }
@@ -597,7 +611,6 @@ private fun JumpToPositionButton(
                     modifier = Modifier
                         .align(dotAlignment)
                         .offset { IntOffset(x = 0, y = dotYOffset.roundToPx()) },
-                    color = ElementTheme.colors.iconSuccessPrimary,
                     border = BorderStroke(2.dp, ElementTheme.colors.bgCanvasDefault),
                     count = 0,
                 )

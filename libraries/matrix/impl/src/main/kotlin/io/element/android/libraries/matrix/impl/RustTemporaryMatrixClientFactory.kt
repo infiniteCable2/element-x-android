@@ -11,22 +11,25 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.appconfig.HomeserverConnectionPolicy
 import io.element.android.appconfig.LockedHomeserverPolicy
+import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.core.extensions.runCatchingExceptions
 import io.element.android.libraries.core.uri.ensureProtocol
 import io.element.android.libraries.matrix.api.TemporaryMatrixClient
 import io.element.android.libraries.matrix.api.TemporaryMatrixClientFactory
 import io.element.android.libraries.matrix.impl.paths.SessionPathsFactory
+import kotlinx.coroutines.withContext
 import java.net.URL
 
 @ContributesBinding(AppScope::class)
 class RustTemporaryMatrixClientFactory(
     private val sessionPathsFactory: SessionPathsFactory,
     private val rustMatrixClientFactory: RustMatrixClientFactory,
+    private val coroutineDispatchers: CoroutineDispatchers,
 ) : TemporaryMatrixClientFactory {
     internal var homeserverConnectionPolicy: HomeserverConnectionPolicy = LockedHomeserverPolicy
 
-    override suspend fun create(serverName: String): Result<TemporaryMatrixClient> {
-        return runCatchingExceptions {
+    override suspend fun create(serverName: String): Result<TemporaryMatrixClient> = withContext(coroutineDispatchers.io) {
+        runCatchingExceptions {
             homeserverConnectionPolicy.requireAllowed(serverName)
             // In case the 'serverName' is a full URL, we need to extract the host and port to pass to the client builder.
             val parsedUrl = URL(serverName.ensureProtocol())
@@ -41,6 +44,7 @@ class RustTemporaryMatrixClientFactory(
                 slidingSyncType = ClientBuilderSlidingSync.Native,
                 isMessageSearchAvailable = false,
                 sessionDelegate = NoOpClientSessionDelegate,
+                autoEnableEncryption = false,
             )
                 .serverName(formattedServerName)
                 .build()
@@ -48,7 +52,7 @@ class RustTemporaryMatrixClientFactory(
                 client.close()
                 error("Resolved homeserver is not allowed by this application")
             }
-            RustTemporaryMatrixClient(client, sessionPaths)
+            RustTemporaryMatrixClient(client, sessionPaths, coroutineDispatchers.io)
         }
     }
 }

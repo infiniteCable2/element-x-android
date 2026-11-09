@@ -15,8 +15,8 @@ import com.google.common.truth.Truth.assertThat
 import io.element.android.features.forward.api.ForwardEntryPoint
 import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.test.AN_EVENT_ID
+import io.element.android.libraries.matrix.test.A_ROOM_ID
 import io.element.android.libraries.matrix.test.A_SESSION_ID
-import io.element.android.libraries.matrix.test.timeline.FakeTimelineProvider
 import io.element.android.libraries.roomselect.test.FakeRoomSelectEntryPoint
 import io.element.android.tests.testutils.lambda.lambdaError
 import io.element.android.tests.testutils.node.TestParentNode
@@ -38,7 +38,7 @@ class DefaultForwardEntryPointTest {
             ForwardMessagesNode(
                 buildContext = buildContext,
                 plugins = plugins,
-                presenterFactory = { _, _ -> createForwardMessagesPresenter() },
+                presenterFactory = { createForwardMessagesPresenter() },
                 roomSelectEntryPoint = FakeRoomSelectEntryPoint(),
                 sessionId = A_SESSION_ID,
             )
@@ -48,7 +48,7 @@ class DefaultForwardEntryPointTest {
         }
         val params = ForwardEntryPoint.Params(
             eventIds = listOf(AN_EVENT_ID),
-            timelineProvider = FakeTimelineProvider(),
+            fromRoomId = A_ROOM_ID,
         )
         val result = entryPoint.createNode(
             parentNode = parentNode,
@@ -60,7 +60,7 @@ class DefaultForwardEntryPointTest {
         assertThat(result.plugins).contains(
             ForwardMessagesNode.Inputs(
                 eventIds = params.eventIds,
-                timelineProvider = params.timelineProvider,
+                fromRoomId = params.fromRoomId,
             )
         )
         assertThat(result.plugins).contains(callback)

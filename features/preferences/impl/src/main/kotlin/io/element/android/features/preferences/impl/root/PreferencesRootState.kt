@@ -18,6 +18,7 @@ import io.element.android.libraries.appupdater.api.AppUpdateState
 import io.element.android.libraries.designsystem.components.preferences.DropdownOption
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarMessage
 import io.element.android.libraries.matrix.api.user.MatrixUser
+import io.element.android.libraries.matrix.ui.components.switchaccount.OtherAccount
 import kotlinx.collections.immutable.ImmutableList
 
 data class PreferencesRootState(
@@ -30,10 +31,11 @@ data class PreferencesRootState(
     val appUpdateState: AppUpdateState,
     val isMultiAccountEnabled: Boolean,
     val isOtherAccountsSectionExpanded: Boolean,
-    val otherSessions: ImmutableList<MatrixUser>,
+    val otherSessions: ImmutableList<OtherAccount>,
     val showAnalyticsSettings: Boolean,
     val showDeveloperSettings: Boolean,
     val showLabsItem: Boolean,
+    val showLocationSettings: Boolean,
     val snackbarMessage: SnackbarMessage?,
     val eventSink: (PreferencesRootEvent) -> Unit,
 )

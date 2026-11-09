@@ -32,8 +32,6 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.layer.CompositingStrategy
-import androidx.compose.ui.layout.HorizontalAlignmentLine
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -55,19 +53,11 @@ import io.element.android.libraries.testtags.TestTags
 import io.element.android.libraries.testtags.testTag
 import io.element.android.libraries.ui.utils.a11y.isTalkbackActive
 import io.element.android.libraries.ui.utils.graphics.drawInLayer
-import kotlin.math.min
 
 private val BUBBLE_RADIUS = 12.dp
 private val avatarRadius = AvatarSize.TimelineSender.dp / 2
 
 private val MIN_BUBBLE_WIDTH = 80.dp
-
-/**
- * Alignment line published by [MessageEventBubble] at its vertical center.
- * It lets the timeline row align decorations with the bubble itself, instead of with the whole row, whose height also
- * covers the sender information, the reactions, the thread summary and the read receipts.
- */
-val BubbleVerticalCenter = HorizontalAlignmentLine(::min)
 
 @Composable
 fun MessageEventBubble(
@@ -80,6 +70,7 @@ fun MessageEventBubble(
     borderColor: Color? = null,
     content: @Composable BoxScope.() -> Unit = {},
 ) {
+    val bubbleShape = remember(state) { MessageEventBubbleDefaults.shape(state.cutTopStart, state.groupPosition, state.isMine) }
     val clickableModifier = if (isTalkbackActive()) {
         Modifier
     } else {
@@ -87,7 +78,7 @@ fun MessageEventBubble(
             .combinedClickable(
                 onClick = onClick,
                 onLongClick = onLongClick,
-                indication = ripple(),
+                indication = ripple(focusRingShape = bubbleShape),
                 interactionSource = interactionSource
             )
             .onKeyboardContextMenuAction(onLongClick)
@@ -96,19 +87,12 @@ fun MessageEventBubble(
     val cutTopStart = state.cutTopStart
     // Ignore state.isHighlighted for now, we need a design decision on it.
     val backgroundBubbleColor by rememberUpdatedState(customBackgroundColor ?: MessageEventBubbleDefaults.backgroundBubbleColor(state.isMine))
-    val bubbleShape = remember(state) { MessageEventBubbleDefaults.shape(state.cutTopStart, state.groupPosition, state.isMine) }
     val radiusPx = (avatarRadius + SENDER_AVATAR_BORDER_WIDTH).toPx()
     val yOffsetPx = -(NEGATIVE_MARGIN_FOR_BUBBLE + avatarRadius).toPx()
 
     val updatedBorderColor by rememberUpdatedState(borderColor)
     BoxWithConstraints(
         modifier = modifier
-            .layout { measurable, constraints ->
-                val placeable = measurable.measure(constraints)
-                layout(placeable.width, placeable.height, mapOf(BubbleVerticalCenter to placeable.height / 2)) {
-                    placeable.place(0, 0)
-                }
-            }
             .drawWithCache {
                 // Calculate the outline of the background and cache it
                 val outline = bubbleShape.createOutline(size, layoutDirection, this)

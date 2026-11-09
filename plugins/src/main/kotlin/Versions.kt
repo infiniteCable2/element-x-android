@@ -39,17 +39,17 @@ private const val versionYear = 26
  * Month of the version on 2 digits. Value must be in [1,12].
  * Do not update this value. it is updated by the release script.
  */
-private const val versionMonth = 9
+private const val versionMonth = 11
 
 /**
  * Monotonic Android version-code counter for this fork. Keep increasing it within the month,
  * independently of the upstream release number, so existing installations can update in place.
  */
-private const val versionReleaseNumber = 8
+private const val versionReleaseNumber = 1
 
-/** Upstream version 26.09.4, followed by the fork's release counter based on it. */
-private const val upstreamReleaseNumber = 4
-private const val forkReleaseNumber = 2
+/** Upstream version 26.11.0, followed by the fork's release counter based on it. */
+private const val upstreamReleaseNumber = 0
+private const val forkReleaseNumber = 1
 
 object Versions {
     /**

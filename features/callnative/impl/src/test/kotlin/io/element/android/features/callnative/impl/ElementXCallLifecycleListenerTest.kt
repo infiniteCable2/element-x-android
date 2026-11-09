@@ -9,6 +9,7 @@ package io.element.android.features.callnative.impl
 
 import com.google.common.truth.Truth.assertThat
 import io.element.android.call.api.ElementCallData
+import io.element.android.call.api.ElementCallEndReason
 import io.element.android.call.api.rtc.id.RoomId
 import io.element.android.features.call.api.CurrentCall
 import io.element.android.features.call.test.FakeCurrentCallTracker
@@ -30,12 +31,24 @@ class ElementXCallLifecycleListenerTest {
         val listener = createListener(currentCallTracker = currentCallTracker)
 
         listener.onCallStarted(A_CALL)
-        listener.onCallEnded(A_CALL)
+        listener.onCallEnded(A_CALL, ElementCallEndReason.LEFT)
 
         assertThat(currentCallTracker.calls).containsExactly(
             CurrentCall.RoomCall(A_ROOM_ID),
             CurrentCall.None,
         ).inOrder()
+    }
+
+    @Test
+    fun `the app is in a call from start to end, so the sync keeps running in the background`() = runTest {
+        val appForegroundStateService = FakeAppForegroundStateService()
+        val listener = createListener(appForegroundStateService = appForegroundStateService)
+
+        listener.onCallStarted(A_CALL)
+        assertThat(appForegroundStateService.isInCall.value).isTrue()
+
+        listener.onCallEnded(A_CALL, ElementCallEndReason.LEFT)
+        assertThat(appForegroundStateService.isInCall.value).isFalse()
     }
 
     @Test
@@ -59,7 +72,7 @@ class ElementXCallLifecycleListenerTest {
             ringingCallTracker = ringingCallTracker,
         )
 
-        listener.onCallEnded(null)
+        listener.onCallEnded(null, ElementCallEndReason.LEFT)
         runCurrent()
 
         // The current call is always cleared; only the ring needs to know which call it was.
@@ -70,15 +83,16 @@ class ElementXCallLifecycleListenerTest {
     private fun TestScope.createListener(
         currentCallTracker: FakeCurrentCallTracker = FakeCurrentCallTracker(),
         ringingCallTracker: FakeRingingCallTracker = FakeRingingCallTracker(),
+        appForegroundStateService: FakeAppForegroundStateService = FakeAppForegroundStateService(),
     ) = ElementXCallLifecycleListener(
         sessionId = A_SESSION_ID,
         currentCallTracker = currentCallTracker,
         ringingCallTracker = ringingCallTracker,
         sessionCoroutineScope = this,
-        appForegroundStateService = FakeAppForegroundStateService(),
+        appForegroundStateService = appForegroundStateService,
     )
 
     private companion object {
-        val A_CALL = ElementCallData(roomId = RoomId(A_ROOM_ID.value), isAudioCall = true)
+        val A_CALL = ElementCallData(roomId = RoomId(A_ROOM_ID.value), isAudioCall = true, isStartingCall = true)
     }
 }

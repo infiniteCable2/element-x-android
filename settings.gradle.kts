@@ -81,7 +81,6 @@ dependencyResolutionManagement {
                 includeModule("io.element.android", "element-call-api")
                 includeModule("io.element.android", "element-call")
                 includeModule("io.element.android", "element-call-ui")
-                includeModule("io.element.android", "element-call-matrix")
                 includeModule("io.element.android", "element-call-test")
             }
         }
@@ -106,7 +105,6 @@ dependencyResolutionManagement {
                     includeModule("io.element.android", "element-call-api")
                     includeModule("io.element.android", "element-call")
                     includeModule("io.element.android", "element-call-ui")
-                    includeModule("io.element.android", "element-call-matrix")
                     includeModule("io.element.android", "element-call-test")
                 }
             }
@@ -136,7 +134,7 @@ fun includeProjects(directory: File, path: String, maxDepth: Int = 1) {
             val buildFile = File(file, "build.gradle.kts")
             if (buildFile.exists()) {
                 include(newPath)
-                logger.lifecycle("Included project: $newPath")
+                logger.info("Included project: $newPath")
             } else if (maxDepth > 0) {
                 includeProjects(file, newPath, maxDepth - 1)
             }

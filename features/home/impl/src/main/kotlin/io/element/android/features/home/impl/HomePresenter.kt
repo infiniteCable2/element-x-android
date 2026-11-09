@@ -27,6 +27,7 @@ import io.element.android.features.rageshake.api.RageshakeFeatureAvailability
 import io.element.android.libraries.architecture.Presenter
 import io.element.android.libraries.designsystem.utils.snackbar.SnackbarDispatcher
 import io.element.android.libraries.designsystem.utils.snackbar.collectSnackbarMessageAsState
+import io.element.android.libraries.di.annotations.AppCoroutineScope
 import io.element.android.libraries.featureflag.api.FeatureFlagService
 import io.element.android.libraries.featureflag.api.FeatureFlags
 import io.element.android.libraries.indicator.api.IndicatorService
@@ -34,6 +35,7 @@ import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.sync.SyncService
 import io.element.android.libraries.sessionstorage.api.SessionStore
 import kotlinx.collections.immutable.persistentListOf
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.launch
@@ -50,13 +52,16 @@ class HomePresenter(
     private val sessionStore: SessionStore,
     private val announcementService: AnnouncementService,
     private val featureFlagService: FeatureFlagService,
+    @AppCoroutineScope
+    private val appCoroutineScope: CoroutineScope,
 ) : Presenter<HomeState> {
     private val currentUserWithNeighborsBuilder = CurrentUserWithNeighborsBuilder()
 
     @Composable
     override fun present(): HomeState {
-        val coroutineState = rememberCoroutineScope()
+        val coroutineScope = rememberCoroutineScope()
         val matrixUser by client.userProfile.collectAsState()
+        val totalUnreadCount by client.totalUnreadCountFlow.collectAsState()
         val currentUserAndNeighbors by remember {
             combine(
                 client.userProfile,
@@ -111,10 +116,11 @@ class HomePresenter(
                 is HomeEvent.SelectHomeNavigationBarItem -> {
                     currentHomeNavigationBarItemOrdinal = event.item.ordinal
                 }
-                is HomeEvent.SwitchToAccount -> coroutineState.launch {
-                    sessionStore.setLatestSession(event.sessionId.value)
+                // The user is switching account, which destroys this presenter, so use the app scope to not be cancelled.
+                HomeEvent.DismissSwipeAvatarAnnouncement -> appCoroutineScope.launch {
+                    announcementService.onAnnouncementDismissed(Announcement.SwipeAvatarToSwitchAccount)
                 }
-                HomeEvent.DismissMultiAccountAnnouncement -> coroutineState.launch {
+                HomeEvent.DismissMultiAccountAnnouncement -> coroutineScope.launch {
                     announcementService.onAnnouncementDismissed(Announcement.MultiAccount)
                 }
             }
@@ -132,6 +138,7 @@ class HomePresenter(
             snackbarMessage = snackbarMessage,
             canReportBug = canReportBug,
             showMultiAccountAnnouncement = showMultiAccountAnnouncement,
+            totalUnreadCount = totalUnreadCount,
             eventSink = ::handleEvent,
         )
     }

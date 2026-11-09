@@ -37,6 +37,7 @@ dependencies {
     implementation(libs.telephoto.flick)
 
     implementation(projects.features.enterprise.api)
+    implementation(projects.features.messages.api)
     implementation(projects.features.viewfolder.api)
     implementation(projects.features.contentscanner.api)
     implementation(projects.libraries.androidutils)
@@ -46,6 +47,8 @@ dependencies {
     implementation(projects.libraries.dateformatter.api)
     implementation(projects.libraries.di)
     implementation(projects.libraries.designsystem)
+    implementation(projects.libraries.featureflag.api)
+    implementation(projects.libraries.htmlrenderer.api)
     implementation(projects.libraries.matrix.api)
     implementation(projects.libraries.matrixui)
     implementation(projects.libraries.matrixmedia.api)
@@ -62,8 +65,11 @@ dependencies {
 
     testCommonDependencies(libs, true)
     testImplementation(projects.features.enterprise.test)
+    testImplementation(projects.features.messages.test)
     testImplementation(projects.libraries.audio.test)
     testImplementation(projects.libraries.dateformatter.test)
+    testImplementation(projects.libraries.featureflag.test)
+    testImplementation(projects.libraries.htmlrenderer.test)
     testImplementation(projects.libraries.matrix.test)
     testImplementation(projects.libraries.mediaviewer.test)
     testImplementation(projects.services.toolbox.test)
