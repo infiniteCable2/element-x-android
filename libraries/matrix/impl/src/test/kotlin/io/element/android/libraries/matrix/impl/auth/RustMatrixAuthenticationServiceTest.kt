@@ -168,15 +168,20 @@ class RustMatrixAuthenticationServiceTest {
     @Test
     fun `loginWithQrCode closes the client it created when the login fails`() = runTest {
         val closeResult = lambdaRecorder<Unit> {}
+        var scanStarted = false
         val sut = createRustMatrixAuthenticationService(
             clientBuilderProvider = FakeClientBuilderProvider(
                 provideResult = {
                     FakeFfiClientBuilder(
                         buildResult = {
                             FakeFfiClient(
+                                homeserver = TEST_HOMESERVER_URL,
                                 newLoginWithQrCodeHandlerResult = {
                                     FakeFfiLoginWithQrCodeHandler(
-                                        scanResult = { throw HumanQrLoginException.Unknown() },
+                                        scanResult = {
+                                            scanStarted = true
+                                            throw HumanQrLoginException.Unknown()
+                                        },
                                     )
                                 },
                                 closeResult = closeResult,
@@ -188,21 +193,27 @@ class RustMatrixAuthenticationServiceTest {
         )
 
         assertThat(sut.loginWithQrCode(aSdkQrCodeLoginData()) {}.isFailure).isTrue()
+        assertThat(scanStarted).isTrue()
         closeResult.assertions().isCalledOnce()
     }
 
     @Test
     fun `loginWithQrCode cancels the login task when it is cancelled`() = runTest {
         val cancelResult = lambdaRecorder<Unit> {}
+        var waitingForLogin = false
         val sut = createRustMatrixAuthenticationService(
             clientBuilderProvider = FakeClientBuilderProvider(
                 provideResult = {
                     FakeFfiClientBuilder(
                         buildResult = {
                             FakeFfiClient(
+                                homeserver = TEST_HOMESERVER_URL,
                                 newLoginWithQrCodeHandlerResult = {
                                     FakeFfiLoginWithQrCodeHandler(
-                                        scanResult = { awaitCancellation() },
+                                        scanResult = {
+                                            waitingForLogin = true
+                                            awaitCancellation()
+                                        },
                                         cancelResult = cancelResult,
                                     )
                                 },
@@ -218,6 +229,7 @@ class RustMatrixAuthenticationServiceTest {
             sut.loginWithQrCode(aSdkQrCodeLoginData()) {}
         }
         runCurrent()
+        assertThat(waitingForLogin).isTrue()
         cancelResult.assertions().isNeverCalled()
         job.cancel()
         runCurrent()
