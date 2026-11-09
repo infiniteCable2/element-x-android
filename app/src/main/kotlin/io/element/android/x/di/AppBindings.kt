@@ -25,6 +25,8 @@ import io.element.android.libraries.featureflag.api.FeatureFlagService
 import io.element.android.libraries.matrix.api.platform.InitPlatformService
 import io.element.android.libraries.matrix.api.tracing.TracingService
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
+import io.element.android.libraries.push.impl.intent.IntentProvider
+import io.element.android.libraries.sessionstorage.api.SessionStore
 import io.element.android.services.analytics.api.AnalyticsService
 
 @ContributesTo(AppScope::class)
@@ -40,6 +42,8 @@ interface AppBindings {
     fun lockScreenService(): LockScreenService
 
     fun preferencesStore(): AppPreferencesStore
+    fun sessionStore(): SessionStore
+    fun intentProvider(): IntentProvider
 
     fun migrationEntryPoint(): MigrationEntryPoint
 

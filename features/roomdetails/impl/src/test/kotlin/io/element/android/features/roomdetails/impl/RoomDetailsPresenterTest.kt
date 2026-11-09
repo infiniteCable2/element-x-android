@@ -46,6 +46,7 @@ import io.element.android.libraries.matrix.test.notificationsettings.FakeNotific
 import io.element.android.libraries.matrix.test.room.aRoomInfo
 import io.element.android.libraries.matrix.test.room.powerlevels.FakeRoomPermissions
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
+import io.element.android.libraries.preferences.api.store.AssistantChat
 import io.element.android.libraries.preferences.api.store.SessionPreferencesStore
 import io.element.android.libraries.preferences.test.InMemoryAppPreferencesStore
 import io.element.android.libraries.preferences.test.InMemorySessionPreferencesStore
@@ -65,6 +66,7 @@ import io.element.android.tests.testutils.testCoroutineDispatchers
 import io.element.android.tests.testutils.testWithLifecycleOwner
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Rule
@@ -126,6 +128,27 @@ class RoomDetailsPresenterTest {
             bubbleService = io.element.android.libraries.push.test.notifications.bubbles.FakeConversationBubbleService(),
             notificationConversationService = io.element.android.libraries.push.test.notifications.conversations.FakeNotificationConversationService(),
         )
+    }
+
+    @Test
+    fun `present - assistant selection is independent of the bubble`() = runTest {
+        val room = aJoinedRoom()
+        val preferences = InMemoryAppPreferencesStore()
+        val presenter = createRoomDetailsPresenter(room, appPreferencesStore = preferences)
+        presenter.testWithLifecycleOwner(lifecycleOwner = fakeLifecycleOwner) {
+            val initialState = awaitItem()
+            assertThat(initialState.isAssistantChatEnabled).isFalse()
+            initialState.eventSink(RoomDetailsEvent.SetAssistantChatEnabled(true))
+
+            val selectedState = consumeItemsUntilPredicate { it.isAssistantChatEnabled }.last()
+            assertThat(selectedState.isBubbleEnabled).isEqualTo(initialState.isBubbleEnabled)
+            assertThat(preferences.getAssistantChatFlow().first()).isEqualTo(AssistantChat(A_SESSION_ID, room.roomId))
+
+            selectedState.eventSink(RoomDetailsEvent.SetAssistantChatEnabled(false))
+            consumeItemsUntilPredicate { !it.isAssistantChatEnabled }
+            assertThat(preferences.getAssistantChatFlow().first()).isNull()
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test

@@ -12,6 +12,7 @@ import io.element.android.libraries.matrix.api.media.MediaPreviewValue
 import io.element.android.libraries.matrix.api.tracing.LogLevel
 import io.element.android.libraries.matrix.api.tracing.TraceLogPack
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
+import io.element.android.libraries.preferences.api.store.AssistantChat
 import io.element.android.libraries.preferences.api.store.NotificationSound
 import io.element.android.libraries.preferences.api.store.NotificationSoundChannelConfig
 import kotlinx.coroutines.flow.Flow
@@ -37,6 +38,7 @@ class InMemoryAppPreferencesStore(
     callRingtoneChannelVersion: Int = 0,
     callRingtoneDisplayName: String? = null,
 ) : AppPreferencesStore {
+    private val assistantChat = MutableStateFlow<AssistantChat?>(null)
     private val isDeveloperModeEnabled = MutableStateFlow(isDeveloperModeEnabled)
     private val isOtherAccountsExpanded = MutableStateFlow(isOtherAccountsExpanded)
     private val customElementCallBaseUrl = MutableStateFlow(customElementCallBaseUrl)
@@ -53,6 +55,12 @@ class InMemoryAppPreferencesStore(
     private val callRingtone = MutableStateFlow(callRingtone)
     private val callRingtoneChannelVersion = MutableStateFlow(callRingtoneChannelVersion)
     private val callRingtoneDisplayName = MutableStateFlow(callRingtoneDisplayName)
+
+    override fun getAssistantChatFlow(): Flow<AssistantChat?> = assistantChat
+
+    override suspend fun setAssistantChatEnabled(chat: AssistantChat, enabled: Boolean) {
+        assistantChat.update { current -> if (enabled) chat else current.takeUnless { it == chat } }
+    }
 
     override suspend fun setDeveloperModeEnabled(enabled: Boolean) {
         isDeveloperModeEnabled.value = enabled
@@ -182,6 +190,6 @@ class InMemoryAppPreferencesStore(
     }
 
     override suspend fun reset() {
-        // No op
+        assistantChat.value = null
     }
 }

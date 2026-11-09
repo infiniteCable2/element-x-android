@@ -16,6 +16,7 @@ sealed interface RoomDetailsEvent {
     data object CopyRoomId : RoomDetailsEvent
     data class SetFavorite(val isFavorite: Boolean) : RoomDetailsEvent
     data class SetBubbleEnabled(val enabled: Boolean) : RoomDetailsEvent
+    data class SetAssistantChatEnabled(val enabled: Boolean) : RoomDetailsEvent
     data object MarkAsRead : RoomDetailsEvent
     data object MarkAsUnread : RoomDetailsEvent
 }

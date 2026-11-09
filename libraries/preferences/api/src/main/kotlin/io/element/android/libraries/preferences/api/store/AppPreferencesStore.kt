@@ -20,6 +20,12 @@ import kotlinx.coroutines.flow.Flow
  * The default each preference falls back to when it has never been set is given on the getter.
  */
 interface AppPreferencesStore {
+    /** The one chat chosen for Android's assistant entry, or null if none was chosen. */
+    fun getAssistantChatFlow(): Flow<AssistantChat?>
+
+    /** Select [chat], or clear it only if it is still the selected chat. */
+    suspend fun setAssistantChatEnabled(chat: AssistantChat, enabled: Boolean)
+
     /**
      * @param enabled true to expose the developer options in the settings.
      */

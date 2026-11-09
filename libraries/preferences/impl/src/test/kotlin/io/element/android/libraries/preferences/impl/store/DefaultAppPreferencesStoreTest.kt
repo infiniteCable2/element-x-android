@@ -10,12 +10,16 @@ package io.element.android.libraries.preferences.impl.store
 import com.google.common.truth.Truth.assertThat
 import io.element.android.libraries.core.meta.BuildMeta
 import io.element.android.libraries.core.meta.BuildType
+import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.core.SessionId
+import io.element.android.libraries.preferences.api.store.AssistantChat
 import io.element.android.libraries.preferences.test.FakePreferenceDataStoreFactory
+import io.element.android.tests.testutils.robolectric.RobolectricTest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 
-class DefaultAppPreferencesStoreTest {
+class DefaultAppPreferencesStoreTest : RobolectricTest() {
     private val buildMeta = BuildMeta(
         buildType = BuildType.DEBUG,
         isDebuggable = true,
@@ -136,6 +140,35 @@ class DefaultAppPreferencesStoreTest {
 
         store.setOtherAccountsExpanded(true)
         assertThat(store.isOtherAccountsExpandedFlow().first()).isTrue()
+    }
+
+    @Test
+    fun `assistant selection replaces the previous chat and ignores a stale disable`() = runTest {
+        val store = createStore()
+        val firstChat = AssistantChat(SessionId("@first:example.org"), RoomId("!sample:example.org"))
+        val secondChat = firstChat.copy(sessionId = SessionId("@second:example.org"))
+
+        assertThat(store.getAssistantChatFlow().first()).isNull()
+        store.setAssistantChatEnabled(firstChat, true)
+        assertThat(store.getAssistantChatFlow().first()).isEqualTo(firstChat)
+
+        store.setAssistantChatEnabled(secondChat, true)
+        store.setAssistantChatEnabled(firstChat, false)
+        assertThat(store.getAssistantChatFlow().first()).isEqualTo(secondChat)
+
+        store.setAssistantChatEnabled(secondChat, false)
+        assertThat(store.getAssistantChatFlow().first()).isNull()
+    }
+
+    @Test
+    fun `reset removes the assistant selection`() = runTest {
+        val store = createStore()
+        val chat = AssistantChat(SessionId("@example:example.org"), RoomId("!sample:example.org"))
+        store.setAssistantChatEnabled(chat, true)
+
+        store.reset()
+
+        assertThat(store.getAssistantChatFlow().first()).isNull()
     }
 
     private fun createStore() = DefaultAppPreferencesStore(

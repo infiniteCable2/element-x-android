@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="screen_assistant_chat_title">Element assistant</string>
+    <string name="screen_assistant_chat_ready">Open the chat selected in Room details.</string>
+    <string name="screen_assistant_chat_open">Open chat</string>
+    <string name="screen_assistant_chat_not_configured">In Element, open the details of a chat and choose it as your assistant chat.</string>
+    <string name="screen_assistant_chat_locked">Unlock Element in the app before opening a chat from the assistant.</string>
+    <string name="screen_assistant_chat_unavailable">The selected chat is unavailable. Open Element and check the selected account and chat.</string>
+</resources>

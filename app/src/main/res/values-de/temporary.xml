@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="screen_assistant_chat_title">Element-Assistent</string>
+    <string name="screen_assistant_chat_ready">Öffne den in den Chatdetails ausgewählten Chat.</string>
+    <string name="screen_assistant_chat_open">Chat öffnen</string>
+    <string name="screen_assistant_chat_not_configured">Öffne in Element die Details eines Chats und wähle ihn als Assistenten-Chat aus.</string>
+    <string name="screen_assistant_chat_locked">Entsperre Element in der App, bevor du einen Chat über den Assistenten öffnest.</string>
+    <string name="screen_assistant_chat_unavailable">Der ausgewählte Chat ist nicht verfügbar. Prüfe in Element das ausgewählte Konto und den Chat.</string>
+</resources>

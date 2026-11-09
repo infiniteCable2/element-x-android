@@ -52,6 +52,7 @@ import io.element.android.libraries.matrix.api.timeline.ReceiptType
 import io.element.android.libraries.matrix.ui.room.getDirectRoomMember
 import io.element.android.libraries.matrix.ui.room.roomMemberIdentityStateChange
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
+import io.element.android.libraries.preferences.api.store.AssistantChat
 import io.element.android.libraries.preferences.api.store.SessionPreferencesStore
 import io.element.android.libraries.push.api.notifications.NotificationCleaner
 import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
@@ -105,6 +106,8 @@ class RoomDetailsPresenter(
         val selectedBubbleRoom by bubbleService.selectedRoom.collectAsState()
         val canUseBubbles by bubbleService.isAvailable.collectAsState(initial = false)
         val isBubbleEnabled = selectedBubbleRoom == BubbleRoom(client.sessionId, room.roomId)
+        val currentAssistantChat = remember(client.sessionId, room.roomId) { AssistantChat(client.sessionId, room.roomId) }
+        val selectedAssistantChat by remember { appPreferencesStore.getAssistantChatFlow() }.collectAsState(initial = null)
         val joinRule by remember { derivedStateOf { roomInfo.joinRule } }
         val hasNewContent by remember {
             derivedStateOf {
@@ -176,6 +179,9 @@ class RoomDetailsPresenter(
                     }
                 }
                 is RoomDetailsEvent.SetFavorite -> scope.setFavorite(event.isFavorite)
+                is RoomDetailsEvent.SetAssistantChatEnabled -> scope.launch {
+                    appPreferencesStore.setAssistantChatEnabled(currentAssistantChat, event.enabled)
+                }
                 is RoomDetailsEvent.SetBubbleEnabled -> scope.launch {
                     if (event.enabled && canUseBubbles) {
                         val shortcutCreated = notificationConversationService.onSendMessage(
@@ -236,6 +242,7 @@ class RoomDetailsPresenter(
             isFavorite = isFavorite,
             isBubbleEnabled = isBubbleEnabled,
             canUseBubbles = canUseBubbles,
+            isAssistantChatEnabled = selectedAssistantChat == currentAssistantChat,
             displayRolesAndPermissionsSettings = !isDm && permissions.canEditRolesAndPermissions,
             isPublic = joinRule == JoinRule.Public,
             heroes = roomInfo.heroes,

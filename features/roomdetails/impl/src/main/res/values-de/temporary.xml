@@ -4,4 +4,7 @@
     <string name="screen_room_details_chat_bubble_subtitle">Diesen Chat als schwebende Blase öffnen. Blasen müssen auch in den Android-Benachrichtigungseinstellungen erlaubt sein.</string>
     <string name="screen_room_details_chat_bubble_pin_disabled">Mit aktiver App-PIN nicht verfügbar.</string>
     <string name="screen_room_details_chat_bubble_settings">Android-Einstellungen für Chat-Blasen</string>
+    <string name="screen_room_details_assistant_chat_title">Chat für den Android-Assistenten</string>
+    <string name="screen_room_details_assistant_chat_subtitle">Diesen Chat über den Systemassistenten öffnen. Es kann nur ein Chat ausgewählt sein.</string>
+    <string name="screen_room_details_assistant_chat_settings">Element als Standardassistent auswählen</string>
 </resources>

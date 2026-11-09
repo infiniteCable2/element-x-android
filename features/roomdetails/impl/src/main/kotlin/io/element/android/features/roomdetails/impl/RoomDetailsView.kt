@@ -343,6 +343,24 @@ fun RoomDetailsView(
                         },
                     )
                 }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    PreferenceSwitch(
+                        icon = CompoundIcons.Chat(),
+                        title = stringResource(R.string.screen_room_details_assistant_chat_title),
+                        subtitle = stringResource(R.string.screen_room_details_assistant_chat_subtitle),
+                        isChecked = state.isAssistantChatEnabled,
+                        onCheckedChange = { state.eventSink(RoomDetailsEvent.SetAssistantChatEnabled(it)) },
+                    )
+                    if (state.isAssistantChatEnabled) {
+                        val context = LocalContext.current
+                        ListItem(
+                            content = { Text(stringResource(R.string.screen_room_details_assistant_chat_settings)) },
+                            onClick = {
+                                runCatching { context.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }
+                            },
+                        )
+                    }
+                }
             }
             if (state.isEncrypted) {
                 PreferenceCategory(

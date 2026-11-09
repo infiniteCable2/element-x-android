@@ -17,15 +17,19 @@ import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.libraries.core.meta.BuildMeta
 import io.element.android.libraries.core.meta.BuildType
+import io.element.android.libraries.matrix.api.core.RoomId
+import io.element.android.libraries.matrix.api.core.SessionId
 import io.element.android.libraries.matrix.api.media.MediaPreviewValue
 import io.element.android.libraries.matrix.api.tracing.LogLevel
 import io.element.android.libraries.matrix.api.tracing.TraceLogPack
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
+import io.element.android.libraries.preferences.api.store.AssistantChat
 import io.element.android.libraries.preferences.api.store.NotificationSound
 import io.element.android.libraries.preferences.api.store.NotificationSound.Companion.toStored
 import io.element.android.libraries.preferences.api.store.NotificationSoundChannelConfig
 import io.element.android.libraries.preferences.api.store.PreferenceDataStoreFactory
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
@@ -34,6 +38,8 @@ private val customElementCallBaseUrlKey = stringPreferencesKey("elementCallBaseU
 private val themeKey = stringPreferencesKey("theme")
 private val hideInviteAvatarsKey = booleanPreferencesKey("hideInviteAvatars")
 private val otherAccountsExpandedKey = booleanPreferencesKey("otherAccountsExpanded")
+private val assistantChatSessionKey = stringPreferencesKey("assistantChatSession")
+private val assistantChatRoomKey = stringPreferencesKey("assistantChatRoom")
 private val timelineMediaPreviewValueKey = stringPreferencesKey("timelineMediaPreviewValue")
 private val liveLocationMinimumDistanceUpdateKey = intPreferencesKey("liveLocationMinimumDistanceUpdate")
 private val logLevelKey = stringPreferencesKey("logLevel")
@@ -56,6 +62,24 @@ class DefaultAppPreferencesStore(
     preferenceDataStoreFactory: PreferenceDataStoreFactory,
 ) : AppPreferencesStore {
     private val store = preferenceDataStoreFactory.create("elementx_preferences")
+
+    override fun getAssistantChatFlow(): Flow<AssistantChat?> = store.data.map { prefs ->
+        val sessionId = prefs[assistantChatSessionKey] ?: return@map null
+        val roomId = prefs[assistantChatRoomKey] ?: return@map null
+        runCatching { AssistantChat(SessionId(sessionId), RoomId(roomId)) }.getOrNull()
+    }.distinctUntilChanged()
+
+    override suspend fun setAssistantChatEnabled(chat: AssistantChat, enabled: Boolean) {
+        store.edit { prefs ->
+            if (enabled) {
+                prefs[assistantChatSessionKey] = chat.sessionId.value
+                prefs[assistantChatRoomKey] = chat.roomId.value
+            } else if (prefs[assistantChatSessionKey] == chat.sessionId.value && prefs[assistantChatRoomKey] == chat.roomId.value) {
+                prefs.remove(assistantChatSessionKey)
+                prefs.remove(assistantChatRoomKey)
+            }
+        }
+    }
 
     override suspend fun setDeveloperModeEnabled(enabled: Boolean) {
         store.edit { prefs ->

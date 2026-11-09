@@ -4,4 +4,7 @@
     <string name="screen_room_details_chat_bubble_subtitle">Open this chat from a floating bubble. Enable bubbles in Android notification settings.</string>
     <string name="screen_room_details_chat_bubble_pin_disabled">Unavailable while the app PIN is enabled.</string>
     <string name="screen_room_details_chat_bubble_settings">Android bubble settings</string>
+    <string name="screen_room_details_assistant_chat_title">Android assistant chat</string>
+    <string name="screen_room_details_assistant_chat_subtitle">Open this chat with the system assistant. Only one chat can be selected.</string>
+    <string name="screen_room_details_assistant_chat_settings">Choose Element as the default assistant</string>
 </resources>
