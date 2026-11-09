@@ -117,27 +117,32 @@ internal class AssistantVoiceController(
         if (!hasMicrophonePermission()) return update(AssistantVoicePhase.Permission)
         if (hasOtherCall()) return update(AssistantVoicePhase.Busy)
 
-        val room = withTimeoutOrNull(15.seconds) {
-            clients.getOrRestore(target.sessionId).getOrNull()?.getJoinedRoom(target.roomId)
-        } ?: return update(AssistantVoicePhase.Failed)
-        if (!room.info().isDirect || room.info().joinedMembersCount != 2L) return update(AssistantVoicePhase.DirectChatRequired)
-        val peer = withTimeoutOrNull(5.seconds) { room.getDirectRoomMember() }
-            ?.takeIf { it.membership == RoomMembershipState.JOIN && it.userId != target.sessionId }
-            ?: return update(AssistantVoicePhase.DirectChatRequired)
+        val peer = withTimeoutOrNull(20.seconds) {
+            val room = clients.getOrRestore(target.sessionId).getOrNull()?.getJoinedRoom(target.roomId) ?: return@withTimeoutOrNull null
+            room.use {
+                val info = it.info()
+                if (!info.isDirect || info.joinedMembersCount != 2L) return@use null
+                it.getDirectRoomMember()?.takeIf { member -> member.membership == RoomMembershipState.JOIN && member.userId != target.sessionId }
+            }
+        } ?: return update(AssistantVoicePhase.DirectChatRequired)
         val call = withTimeoutOrNull(15.seconds) { controllers.getOrBuild(target.sessionId) } ?: return update(AssistantVoicePhase.Failed)
-        if (resolver.resolve() != AssistantChatState.Ready(target) || !canStart()) return update(AssistantVoicePhase.Locked)
+        val rechecked = resolver.resolve()
+        if (rechecked == AssistantChatState.Locked || !canStart()) return update(AssistantVoicePhase.Locked)
+        if (rechecked != AssistantChatState.Ready(target)) return update(AssistantVoicePhase.Failed)
         if (!hasMicrophonePermission()) return update(AssistantVoicePhase.Permission)
         if (hasOtherCall()) return update(AssistantVoicePhase.Busy)
 
         val roomId = RoomId(target.roomId.value)
         controller = call
+        controllers.setStartingFromAssistant(target.sessionId)
         try {
             call.startCall(ElementCallData(roomId = roomId, isAudioCall = true, isStartingCall = true))
-            call.setMaximized(false)
-            call.setMicrophonePermissionGranted(true)
             if (withTimeoutOrNull(8.seconds) { call.state.first { it?.callData?.roomId == roomId } } == null) {
                 return update(AssistantVoicePhase.Failed)
             }
+            call.setMaximized(false)
+            controllers.setStartingFromAssistant(null)
+            call.setMicrophonePermissionGranted(true)
 
             var signalled = false
             call.state.first { snapshot ->
@@ -168,7 +173,11 @@ internal class AssistantVoiceController(
             }
         } finally {
             val snapshot = call.state.value
-            if (snapshot == null || snapshot.callData.roomId == roomId) call.hangUp()
+            if (snapshot == null || snapshot.callData.roomId == roomId) {
+                call.setMaximized(false)
+                call.hangUp()
+            }
+            controllers.setStartingFromAssistant(null)
             controller = null
         }
     }

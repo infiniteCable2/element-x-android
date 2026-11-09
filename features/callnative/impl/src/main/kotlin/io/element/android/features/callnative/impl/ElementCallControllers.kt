@@ -34,9 +34,9 @@ import io.element.android.libraries.push.api.notifications.NotificationIdProvide
 import io.element.android.services.appnavstate.api.AppForegroundStateService
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
@@ -64,6 +64,9 @@ interface ElementCallControllers {
      * a call is first placed or answered, and whatever draws the call has to notice when it does.
      */
     fun controller(sessionId: SessionId): Flow<ElementCallController?>
+
+    /** Defer the in-app call screen until the system assistant has minimised its new call. */
+    fun setStartingFromAssistant(sessionId: SessionId?)
 
     /**
      * The controller of whichever session currently has a call, or null when none does.
@@ -100,6 +103,7 @@ class DefaultElementCallControllers(
 ) : ElementCallControllers {
     // A flow rather than a plain map because what draws the call has to see the stack appear.
     private val stacks = MutableStateFlow<Map<SessionId, ElementCallStack>>(emptyMap())
+    private val startingFromAssistant = MutableStateFlow<SessionId?>(null)
 
     // One at a time across every session: two calls placed at once must not race into two stacks for
     // the same session, because only one of them would ever be closed.
@@ -126,7 +130,13 @@ class DefaultElementCallControllers(
     }
 
     override fun controller(sessionId: SessionId): Flow<ElementCallController?> =
-        stacks.map { it[sessionId]?.controller }.distinctUntilChanged()
+        combine(stacks, startingFromAssistant) { stacks, assistantSession ->
+            stacks[sessionId]?.controller?.takeUnless { sessionId == assistantSession }
+        }.distinctUntilChanged()
+
+    override fun setStartingFromAssistant(sessionId: SessionId?) {
+        startingFromAssistant.value = sessionId
+    }
 
     override fun withRunningCall(): ElementCallController? =
         stacks.value.values.firstNotNullOfOrNull { stack ->

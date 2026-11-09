@@ -109,7 +109,8 @@ private class AssistantVoiceSession(
             clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
-        controller.show()
+        // onShow runs before the system makes the voice window visible.
+        scope.launch(Dispatchers.Main) { controller.show() }
     }
 
     override fun onDestroy() {

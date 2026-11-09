@@ -28,6 +28,8 @@ class FakeElementCallControllers(
 
     override fun controller(sessionId: SessionId): Flow<ElementCallController?> = flowOf(controller)
 
+    override fun setStartingFromAssistant(sessionId: SessionId?) = Unit
+
     override fun withRunningCall(): ElementCallController? =
         controller?.takeIf { it.state.value != null }
 }
