@@ -26,7 +26,9 @@ import io.element.android.libraries.featureflag.api.FeatureFlagService
 import io.element.android.libraries.featureflag.api.FeatureFlags
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.api.MatrixClientProvider
+import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.SessionId
+import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.tracing.LogLevel
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
 import io.element.android.libraries.push.api.notifications.ForegroundServiceType
@@ -68,6 +70,9 @@ interface ElementCallControllers {
     /** Defer the in-app call screen until the system assistant has minimised its new call. */
     fun setStartingFromAssistant(sessionId: SessionId?)
 
+    /** Scope the native RTC presentation marker to one Assistant Voice call. */
+    fun beginAssistantVoice(sessionId: SessionId, roomId: RoomId, peerId: UserId): AssistantVoiceAttempt?
+
     /**
      * The controller of whichever session currently has a call, or null when none does.
      *
@@ -102,7 +107,7 @@ class DefaultElementCallControllers(
     private val featureFlagService: FeatureFlagService,
 ) : ElementCallControllers {
     // A flow rather than a plain map because what draws the call has to see the stack appear.
-    private val stacks = MutableStateFlow<Map<SessionId, ElementCallStack>>(emptyMap())
+    private val stacks = MutableStateFlow<Map<SessionId, SessionCallStack>>(emptyMap())
     private val startingFromAssistant = MutableStateFlow<SessionId?>(null)
 
     // One at a time across every session: two calls placed at once must not race into two stacks for
@@ -110,20 +115,22 @@ class DefaultElementCallControllers(
     private val mutex = Mutex()
 
     override suspend fun getOrBuild(sessionId: SessionId): ElementCallController? = mutex.withLock {
-        stacks.value[sessionId]?.let { return@withLock it.controller }
+        stacks.value[sessionId]?.let { return@withLock it.stack.controller }
         val client = matrixClientProvider.getOrRestore(sessionId).getOrNull()
         if (client == null) {
             Timber.w("NativeCall: no client for $sessionId, cannot start a call")
             return@withLock null
         }
-        build(client).also { stack ->
-            stacks.update { it + (sessionId to stack) }
+        val stateEvents = AssistantRtcStateEvents(client.sessionId.value)
+        build(client, stateEvents).also { stack ->
+            val sessionStack = SessionCallStack(stack, stateEvents)
+            stacks.update { it + (sessionId to sessionStack) }
             client.sessionCoroutineScope.launch { stack.controller.followConnectivity(client.syncService.isOnline) }
             // The client's scope is the stack's lifetime: the component has no shutdown of its own, so
             // cancelling this at logout is what stops the RTC core. Closing here only releases the
             // component's own reference, so a dead stack is not left behind it.
             client.sessionCoroutineScope.coroutineContext.job.invokeOnCompletion {
-                stacks.update { if (it[sessionId] === stack) it - sessionId else it }
+                stacks.update { if (it[sessionId] === sessionStack) it - sessionId else it }
                 stack.close()
             }
         }.controller
@@ -131,20 +138,23 @@ class DefaultElementCallControllers(
 
     override fun controller(sessionId: SessionId): Flow<ElementCallController?> =
         combine(stacks, startingFromAssistant) { stacks, assistantSession ->
-            stacks[sessionId]?.controller?.takeUnless { sessionId == assistantSession }
+            stacks[sessionId]?.stack?.controller?.takeUnless { sessionId == assistantSession }
         }.distinctUntilChanged()
 
     override fun setStartingFromAssistant(sessionId: SessionId?) {
         startingFromAssistant.value = sessionId
     }
 
+    override fun beginAssistantVoice(sessionId: SessionId, roomId: RoomId, peerId: UserId): AssistantVoiceAttempt? =
+        stacks.value[sessionId]?.stateEvents?.begin(roomId.value, peerId.value)
+
     override fun withRunningCall(): ElementCallController? =
-        stacks.value.values.firstNotNullOfOrNull { stack ->
-            stack.controller.takeIf { it.state.value != null }
+        stacks.value.values.firstNotNullOfOrNull { sessionStack ->
+            sessionStack.stack.controller.takeIf { it.state.value != null }
         }
 
-    private suspend fun build(client: MatrixClient): ElementCallStack =
-        ElementCallStack.Builder(context, backendFactory.create(client))
+    private suspend fun build(client: MatrixClient, stateEvents: AssistantRtcStateEvents): ElementCallStack =
+        ElementCallStack.Builder(context, backendFactory.create(client, stateEvents))
             .lifecycleListener(
                 ElementXCallLifecycleListener(
                     sessionId = client.sessionId,
@@ -192,4 +202,6 @@ class DefaultElementCallControllers(
         LogLevel.DEBUG -> MatrixRtcLogLevel.DEBUG
         LogLevel.TRACE -> MatrixRtcLogLevel.TRACE
     }
+
+    private data class SessionCallStack(val stack: ElementCallStack, val stateEvents: AssistantRtcStateEvents)
 }

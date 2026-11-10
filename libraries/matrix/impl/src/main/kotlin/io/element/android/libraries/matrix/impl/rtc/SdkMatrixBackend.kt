@@ -7,6 +7,7 @@
 
 package io.element.android.libraries.matrix.impl.rtc
 
+import io.element.android.features.callnative.api.MatrixRtcApplicationEvents
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.core.extensions.runCatchingExceptions
 import kotlinx.coroutines.CancellationException
@@ -47,6 +48,7 @@ class SdkMatrixBackend(
     private val client: Client,
     private val sessionScope: CoroutineScope,
     private val dispatchers: CoroutineDispatchers,
+    private val applicationEvents: MatrixRtcApplicationEvents,
 ) : MatrixBackend {
     private val userId = client.userId()
     private val deviceId = client.deviceId()
@@ -83,7 +85,10 @@ class SdkMatrixBackend(
     override suspend fun cancelDelayedEvent(roomId: String, delayId: String) = throw delayedEventsNotSupported()
 
     override suspend fun sendStateEvent(roomId: String, eventType: String, stateKey: String, contentJson: String): String =
-        send("sendStateEvent($eventType)") { room(roomId).use { it.sendStateEventRaw(eventType, stateKey, contentJson, noRetry) } }
+        send("sendStateEvent($eventType)") {
+            val content = applicationEvents.outgoing(roomId, eventType, stateKey, deviceId, contentJson)
+            room(roomId).use { it.sendStateEventRaw(eventType, stateKey, content, noRetry) }
+        }
 
     override suspend fun sendRoomEvent(roomId: String, eventType: String, contentJson: String): String =
         send("sendRoomEvent($eventType)") { room(roomId).use { it.sendRaw(eventType, contentJson, noRetry) } }
@@ -108,7 +113,10 @@ class SdkMatrixBackend(
         val job = sessionScope.launch {
             deliver("sticky events", room.stickyEventSets(dispatchers), sink::onStickyEvents)
             for (type in subjects.stateEventTypes) {
-                deliver("state $type", room.stateEventSets(type, dispatchers)) { sink.onStateEvents(type, it) }
+                deliver("state $type", room.stateEventSets(type, dispatchers)) {
+                    applicationEvents.received(roomId, type, it)
+                    sink.onStateEvents(type, it)
+                }
             }
             deliver("joined members", room.joinedMemberIds(dispatchers), sink::onJoinedMembers)
             deliver("encryption", room.encryptionUpdates(dispatchers), sink::onEncryption)
@@ -121,8 +129,13 @@ class SdkMatrixBackend(
         return JobSubscription(job)
     }
 
-    override fun subscribeToDevice(eventTypes: List<String>, sink: ToDeviceSink): BackendSubscription =
-        JobSubscription(sessionScope.deliver("to-device $eventTypes", client.toDeviceMessages(eventTypes, dispatchers), sink::onToDeviceMessage))
+    override fun subscribeToDevice(eventTypes: List<String>, sink: ToDeviceSink): BackendSubscription {
+        val subscribed = (eventTypes + applicationEvents.toDeviceEventTypes).distinct()
+        return JobSubscription(sessionScope.deliver("to-device events", client.toDeviceMessages(subscribed, dispatchers)) { event ->
+            if (event.eventType in applicationEvents.toDeviceEventTypes) applicationEvents.receivedToDevice(event)
+            if (event.eventType in eventTypes) sink.onToDeviceMessage(event)
+        })
+    }
 
     /**
      * `Room.loadOrFetchEventWithRelations` returns typed content, with neither raw JSON nor encryption info, so a hand raised

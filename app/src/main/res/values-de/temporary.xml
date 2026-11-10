@@ -20,4 +20,5 @@
     <string name="screen_assistant_voice_unmute">Mikrofon an</string>
     <string name="screen_assistant_voice_hang_up">Auflegen</string>
     <string name="screen_assistant_voice_hide">Minimieren</string>
+    <string name="screen_assistant_voice_you">Du</string>
 </resources>

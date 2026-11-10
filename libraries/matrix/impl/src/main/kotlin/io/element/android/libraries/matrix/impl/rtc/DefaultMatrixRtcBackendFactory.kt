@@ -10,6 +10,7 @@ package io.element.android.libraries.matrix.impl.rtc
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.features.callnative.api.MatrixRtcBackendFactory
+import io.element.android.features.callnative.api.MatrixRtcApplicationEvents
 import io.element.android.libraries.core.coroutine.CoroutineDispatchers
 import io.element.android.libraries.matrix.api.MatrixClient
 import io.element.android.libraries.matrix.impl.RustMatrixClient
@@ -30,11 +31,12 @@ import org.matrix.rtc.MatrixBackend
 class DefaultMatrixRtcBackendFactory(
     private val dispatchers: CoroutineDispatchers,
 ) : MatrixRtcBackendFactory {
-    override fun create(client: MatrixClient): MatrixBackend {
+    override fun create(client: MatrixClient, applicationEvents: MatrixRtcApplicationEvents): MatrixBackend {
         return SdkMatrixBackend(
             client = (client as RustMatrixClient).innerClient,
             sessionScope = client.sessionCoroutineScope,
             dispatchers = dispatchers,
+            applicationEvents = applicationEvents,
         )
     }
 }

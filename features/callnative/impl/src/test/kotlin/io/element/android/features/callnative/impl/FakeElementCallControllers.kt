@@ -8,7 +8,9 @@
 package io.element.android.features.callnative.impl
 
 import io.element.android.call.api.ElementCallController
+import io.element.android.libraries.matrix.api.core.RoomId
 import io.element.android.libraries.matrix.api.core.SessionId
+import io.element.android.libraries.matrix.api.core.UserId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flowOf
 
@@ -29,6 +31,8 @@ class FakeElementCallControllers(
     override fun controller(sessionId: SessionId): Flow<ElementCallController?> = flowOf(controller)
 
     override fun setStartingFromAssistant(sessionId: SessionId?) = Unit
+
+    override fun beginAssistantVoice(sessionId: SessionId, roomId: RoomId, peerId: UserId): AssistantVoiceAttempt? = null
 
     override fun withRunningCall(): ElementCallController? =
         controller?.takeIf { it.state.value != null }

@@ -74,9 +74,11 @@ private class AssistantVoiceSession(
         setViewTreeSavedStateRegistryOwner(owner)
         setContent {
             val state by controller.state.collectAsState()
+            val captions by controller.captions.collectAsState()
             ElementTheme(applySystemBarsUpdate = false) {
                 AssistantVoiceBar(
                     state = state,
+                    captions = captions,
                     onMute = controller::toggleMute,
                     onHangUp = {
                         controller.hangUp()

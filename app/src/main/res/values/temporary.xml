@@ -20,4 +20,5 @@
     <string name="screen_assistant_voice_unmute">Unmute</string>
     <string name="screen_assistant_voice_hang_up">Hang up</string>
     <string name="screen_assistant_voice_hide">Minimise</string>
+    <string name="screen_assistant_voice_you">You</string>
 </resources>

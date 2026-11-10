@@ -8,6 +8,8 @@
 package io.element.android.features.callnative.api
 
 import io.element.android.libraries.matrix.api.MatrixClient
+import org.matrix.rtc.FfiEventIn
+import org.matrix.rtc.FfiToDeviceMessageIn
 import org.matrix.rtc.MatrixBackend
 
 /**
@@ -22,5 +24,13 @@ import org.matrix.rtc.MatrixBackend
  * is known only as an id until a client is fetched for it.
  */
 fun interface MatrixRtcBackendFactory {
-    fun create(client: MatrixClient): MatrixBackend
+    fun create(client: MatrixClient, applicationEvents: MatrixRtcApplicationEvents): MatrixBackend
+}
+
+/** Application data alongside the native RTC stack, independent of its media and key handling. */
+interface MatrixRtcApplicationEvents {
+    val toDeviceEventTypes: Set<String>
+    fun outgoing(roomId: String, eventType: String, stateKey: String, deviceId: String, contentJson: String): String
+    fun received(roomId: String, eventType: String, events: List<FfiEventIn>)
+    fun receivedToDevice(event: FfiToDeviceMessageIn)
 }

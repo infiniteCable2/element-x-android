@@ -44,6 +44,7 @@ dependencies {
     implementation(projects.libraries.push.api)
     implementation(projects.services.appnavstate.api)
     implementation(libs.androidx.corektx)
+    implementation(libs.serialization.json)
 
     testCommonDependencies(libs)
     testImplementation(libs.element.call.test)
