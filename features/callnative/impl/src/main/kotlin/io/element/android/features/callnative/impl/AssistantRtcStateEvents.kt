@@ -61,6 +61,7 @@ internal class AssistantRtcStateEvents(
         if (attempt.caller != caller) {
             attempt.caller = caller
             attempt.mutableReadyPeers.value = emptySet()
+            attempt.captionDevices = emptySet()
             attempt.clearCaptions()
         }
         val marker = buildJsonObject {
@@ -68,6 +69,7 @@ internal class AssistantRtcStateEvents(
             put("version", VERSION)
             put("purpose", PURPOSE)
             put("request_id", attempt.requestId)
+            put("captions", true)
         }
         return JsonObject(content + (NAMESPACE to marker)).toString()
     }
@@ -78,28 +80,32 @@ internal class AssistantRtcStateEvents(
         val caller = attempt.caller ?: return
         val now = nowMs()
         // The SDK supplies the complete current state set, so a leave replaces readiness.
-        attempt.mutableReadyPeers.value = events.mapNotNullTo(mutableSetOf()) { event ->
-            if (event.sender != attempt.peerId) return@mapNotNullTo null
-            val content = parseObject(event.contentJson) ?: return@mapNotNullTo null
-            val deviceId = content.string("device_id")?.takeIf(String::isNotEmpty) ?: return@mapNotNullTo null
-            if (!isDefaultStateKey(event.stateKey, event.sender, deviceId) || !content.isDefaultCall()) return@mapNotNullTo null
+        val ready = events.mapNotNull { event ->
+            if (event.sender != attempt.peerId) return@mapNotNull null
+            val content = parseObject(event.contentJson) ?: return@mapNotNull null
+            val deviceId = content.string("device_id")?.takeIf(String::isNotEmpty) ?: return@mapNotNull null
+            if (!isDefaultStateKey(event.stateKey, event.sender, deviceId) || !content.isDefaultCall()) return@mapNotNull null
             val created = content.unsigned("created_ts")?.coerceAtMost(event.originServerTs) ?: event.originServerTs
             val expires = content.unsigned("expires") ?: DEFAULT_EXPIRES_MS
-            if (now >= created && now - created >= expires) return@mapNotNullTo null
+            if (now >= created && now - created >= expires) return@mapNotNull null
 
-            val marker = content[NAMESPACE] as? JsonObject ?: return@mapNotNullTo null
+            val marker = content[NAMESPACE] as? JsonObject ?: return@mapNotNull null
             if (marker["version"] != JsonPrimitive(VERSION) ||
                 marker.string("purpose") != PURPOSE ||
                 marker.string("request_id") != attempt.requestId ||
                 marker.string("state") != "ready"
-            ) return@mapNotNullTo null
-            val replyTo = marker["caller"] as? JsonObject ?: return@mapNotNullTo null
+            ) return@mapNotNull null
+            val replyTo = marker["caller"] as? JsonObject ?: return@mapNotNull null
             if (replyTo.string("user_id") != caller.userId ||
                 replyTo.string("device_id") != caller.deviceId ||
                 replyTo.string("member_id") != caller.memberId
-            ) return@mapNotNullTo null
-            AssistantVoicePeer(event.sender, deviceId, content.memberId(event.sender, deviceId))
+            ) return@mapNotNull null
+            AssistantVoicePeer(event.sender, deviceId, content.memberId(event.sender, deviceId)) to (marker["captions"] == JsonPrimitive(true))
         }
+        val captionDevices = ready.filter { (_, offersCaptions) -> offersCaptions }.mapTo(mutableSetOf()) { (peer, _) -> peer.deviceId }
+        if (!captionDevices.containsAll(attempt.captionDevices)) attempt.clearCaptions()
+        attempt.captionDevices = captionDevices
+        attempt.mutableReadyPeers.value = ready.mapTo(mutableSetOf()) { (peer, _) -> peer }
         attempt.publishCaptions()
     }
 
@@ -108,6 +114,7 @@ internal class AssistantRtcStateEvents(
         val attempt = current?.takeIf { it.caller != null && it.peerId == event.sender } ?: return
         if (event.eventType != CAPTION_TYPE || !event.encryption.encrypted || event.encryption.senderConfirmed != true) return
         val deviceId = event.encryption.senderDeviceId ?: return
+        if (attempt.readyPeers.value.any { it.deviceId == deviceId } && deviceId !in attempt.captionDevices) return
         if (event.contentJson.length > MAX_CAPTION_JSON) return
         val payload = parseObject(event.contentJson) ?: return
         if (payload["version"] != JsonPrimitive(VERSION) ||
@@ -135,6 +142,7 @@ internal class AssistantRtcStateEvents(
         var caller: AssistantVoicePeer? = null
         val mutableReadyPeers = MutableStateFlow<Set<AssistantVoicePeer>>(emptySet())
         override val readyPeers = mutableReadyPeers.asStateFlow()
+        var captionDevices: Set<String> = emptySet()
         private val mutableCaptions = MutableStateFlow<List<AssistantVoiceCaption>>(emptyList())
         override val captions = mutableCaptions.asStateFlow()
         // The membership update and the first Olm message can reach sync in either order.
@@ -147,11 +155,10 @@ internal class AssistantRtcStateEvents(
         }
 
         fun publishCaptions() {
-            val ready = readyPeers.value.mapTo(mutableSetOf()) { it.deviceId }
             val existing = mutableCaptions.value
             val bySequence = existing.associateByTo(sortedMapOf()) { it.sequence }
             pending.removeAll { (deviceId, caption) ->
-                if (deviceId !in ready) return@removeAll false
+                if (deviceId !in captionDevices) return@removeAll readyPeers.value.any { it.deviceId == deviceId }
                 bySequence.putIfAbsent(caption.sequence, caption)
                 true
             }

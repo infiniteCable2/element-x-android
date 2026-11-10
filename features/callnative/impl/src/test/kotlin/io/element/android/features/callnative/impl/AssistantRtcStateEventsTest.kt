@@ -8,6 +8,7 @@ package io.element.android.features.callnative.impl
 import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Test
@@ -29,6 +30,7 @@ class AssistantRtcStateEventsTest {
         val marker = join.getValue(NAMESPACE).jsonObject
         val request = marker.getValue("request_id").jsonPrimitive.content
         assertThat(UUID.fromString(request).version()).isEqualTo(4)
+        assertThat(marker["captions"]).isEqualTo(JsonPrimitive(true))
         assertThat(marker["existing"]?.jsonPrimitive?.content).isEqualTo("preserved")
         assertThat(JsonObject(join - NAMESPACE)).isEqualTo(JsonObject(Json.parseToJsonElement(JOIN).jsonObject - NAMESPACE))
         assertThat(requestId()).isEqualTo(request)
@@ -84,7 +86,7 @@ class AssistantRtcStateEventsTest {
         events.receivedToDevice(answer)
         assertThat(attempt.captions.value).isEmpty()
 
-        events.received(ROOM, MEMBER_TYPE, listOf(reply(id)))
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersCaptions = true)))
         events.receivedToDevice(caption(id, 1, "user", "What should I cook?"))
         events.receivedToDevice(answer)
         assertThat(attempt.captions.value).containsExactly(
@@ -99,7 +101,7 @@ class AssistantRtcStateEventsTest {
     fun `captions are scoped to the current room request and encrypted answering device`() {
         val attempt = checkNotNull(events.begin(ROOM, PEER))
         val id = requestId()
-        events.received(ROOM, MEMBER_TYPE, listOf(reply(id)))
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersCaptions = true)))
         val text = "Not a caption for this call"
         val valid = caption(id, 1, "assistant", text)
         listOf(
@@ -110,6 +112,24 @@ class AssistantRtcStateEventsTest {
             caption("prior-request", 1, "assistant", text),
             caption(id, 1, "assistant", text, room = OTHER_ROOM),
         ).forEach(events::receivedToDevice)
+        assertThat(attempt.captions.value).isEmpty()
+    }
+
+    @Test
+    fun `audio ready alone does not enable captions and a withdrawn offer clears them`() {
+        val attempt = checkNotNull(events.begin(ROOM, PEER))
+        val id = requestId()
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(id)))
+        events.receivedToDevice(caption(id, 1, "assistant", "Hello"))
+        assertThat(attempt.readyPeers.value).isNotEmpty()
+        assertThat(attempt.captions.value).isEmpty()
+
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersCaptions = true)))
+        assertThat(attempt.captions.value).isEmpty()
+        events.receivedToDevice(caption(id, 2, "assistant", "Text offered"))
+        assertThat(attempt.captions.value).hasSize(1)
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersCaptions = false)))
+        assertThat(attempt.readyPeers.value).isNotEmpty()
         assertThat(attempt.captions.value).isEmpty()
     }
 
@@ -134,6 +154,7 @@ class AssistantRtcStateEventsTest {
         callerMember: String = "$CALLER:$CALLER_DEVICE",
         callId: String = "",
         origin: ULong = NOW,
+        offersCaptions: Boolean? = null,
     ) = FfiEventIn(
         eventId = "\$ready",
         sender = sender,
@@ -143,6 +164,7 @@ class AssistantRtcStateEventsTest {
         contentJson = """
             {"application":"m.call","scope":"m.room","call_id":"$callId","device_id":"$PEER_DEVICE","expires":60000,
              "$NAMESPACE":{"version":1,"purpose":"assistant-voice","request_id":"$request","state":"$state",
+             ${offersCaptions?.let { """"captions":$it,""" }.orEmpty()}
              "caller":{"user_id":"$CALLER","device_id":"$callerDevice","member_id":"$callerMember"}}}
         """.trimIndent(),
         encryption = FfiEventEncryption(encrypted = false, senderDeviceId = null, senderConfirmed = null),
