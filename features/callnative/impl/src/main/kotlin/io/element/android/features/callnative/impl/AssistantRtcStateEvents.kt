@@ -104,12 +104,16 @@ internal class AssistantRtcStateEvents(
                 marker.string("purpose") != PURPOSE ||
                 marker.string("request_id") != attempt.requestId ||
                 marker.string("state") != "ready"
-            ) return@mapNotNull null
+            ) {
+                return@mapNotNull null
+            }
             val replyTo = marker["caller"] as? JsonObject ?: return@mapNotNull null
             if (replyTo.string("user_id") != caller.userId ||
                 replyTo.string("device_id") != caller.deviceId ||
                 replyTo.string("member_id") != caller.memberId
-            ) return@mapNotNull null
+            ) {
+                return@mapNotNull null
+            }
             val talkSession = marker.string("talk_session_id")?.takeIf { it.isNotEmpty() }
                 ?.takeIf { marker["talk_events"] == JsonPrimitive(true) }
             Triple(
@@ -139,7 +143,9 @@ internal class AssistantRtcStateEvents(
         val payload = parseObject(event.contentJson) ?: return
         if (payload["version"] != JsonPrimitive(VERSION) ||
             payload.string("room_id") != attempt.roomId || payload.string("request_id") != attempt.requestId
-        ) return
+        ) {
+            return
+        }
         if (event.eventType == TALK_TYPE) {
             val talk = (payload["event"] as? JsonObject)?.parseTalkEvent() ?: return
             attempt.talk.receive(deviceId, talk)
@@ -182,6 +188,7 @@ internal class AssistantRtcStateEvents(
         var captionDevices: Set<String> = emptySet()
         private val mutableCaptions = MutableStateFlow<List<AssistantVoiceCaption>>(emptyList())
         override val captions = mutableCaptions.asStateFlow()
+
         // The membership update and the first Olm message can reach sync in either order.
         private val pending = ArrayDeque<Pair<String, AssistantVoiceCaption>>()
 

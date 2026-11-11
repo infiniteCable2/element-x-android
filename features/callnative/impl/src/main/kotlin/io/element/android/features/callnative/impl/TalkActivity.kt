@@ -62,7 +62,9 @@ internal fun JsonObject.parseTalkEvent(): TalkEvent? {
         text("brain") !in setOf("agent-consult", "direct-tools", "none") ||
         !validOptionalIdentifiers("provider", "turnId", "captureId", "callId", "itemId", "parentId") ||
         containsKey("final") && (get("final") != JsonPrimitive(true) && get("final") != JsonPrimitive(false))
-    ) return null
+    ) {
+        return null
+    }
     val payload = (get("payload") as? JsonObject)?.takeIf { it["version"] == JsonPrimitive(1) }
     return when (text("type")) {
         "session.activity" -> TalkEvent(id, sessionId, sequence, true, payload?.parseActivity(), null)
@@ -82,7 +84,9 @@ internal fun TalkSessionState?.accept(event: TalkEvent): TalkSessionState? {
     if (this != null && sessionId != event.sessionId) return this
     if (event.isActivity && event.sequence <= (this?.activitySequence ?: -1) ||
         !event.isActivity && event.sequence <= (this?.outcomeSequence ?: -1)
-    ) return this
+    ) {
+        return this
+    }
     val activity = if (event.isActivity) event.activity else this?.activity
     // A late terminal capture event is information about that capture, never a command to reset input.
     val outcome = (if (event.isActivity) this?.inputOutcome else event.inputOutcome)?.takeIf {
@@ -152,6 +156,20 @@ private inline fun <reified T : Enum<T>> JsonObject.wireEnum(key: String): T? =
     enumValues<T>().firstOrNull { it.name.lowercase().replace('_', '-') == text(key) }
 
 private val TALK_EVENT_FIELDS = setOf(
-    "id", "type", "sessionId", "seq", "timestamp", "mode", "transport", "brain", "payload",
-    "provider", "turnId", "captureId", "callId", "itemId", "parentId", "final",
+    "id",
+    "type",
+    "sessionId",
+    "seq",
+    "timestamp",
+    "mode",
+    "transport",
+    "brain",
+    "payload",
+    "provider",
+    "turnId",
+    "captureId",
+    "callId",
+    "itemId",
+    "parentId",
+    "final",
 )

@@ -37,7 +37,9 @@ internal class AssistantTalkEvents {
             if (event.isActivity) {
                 if (pending.any { (sender, previous) ->
                     sender == device && previous.sessionId == event.sessionId && previous.isActivity && previous.sequence >= event.sequence
-                }) return
+                }) {
+                    return
+                }
                 pending.removeAll { (sender, previous) -> sender == device && previous.sessionId == event.sessionId && previous.isActivity }
             }
             if (pending.size == 64) pending.removeFirst()

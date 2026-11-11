@@ -7,12 +7,12 @@ package io.element.android.features.callnative.impl
 
 import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.matrix.rtc.FfiEventEncryption
 import org.matrix.rtc.FfiEventIn

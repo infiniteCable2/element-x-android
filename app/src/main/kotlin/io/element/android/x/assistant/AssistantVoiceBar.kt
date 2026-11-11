@@ -108,13 +108,17 @@ internal fun AssistantVoiceBar(
 @Composable
 private fun AssistantActivity(activity: TalkActivity, outcome: TalkInputOutcome?) {
     Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        val inputLabel = if (!activity.input.available) R.string.screen_assistant_input_unavailable else when (activity.input.phase) {
+        val inputLabel = if (!activity.input.available) {
+            R.string.screen_assistant_input_unavailable
+        } else {
+            when (activity.input.phase) {
             TalkActivity.InputPhase.LISTENING -> R.string.screen_assistant_voice_listening
             TalkActivity.InputPhase.RECEIVING -> R.string.screen_assistant_input_receiving
             TalkActivity.InputPhase.CANDIDATE -> R.string.screen_assistant_input_candidate
             TalkActivity.InputPhase.SPEECH -> R.string.screen_assistant_input_speech
             TalkActivity.InputPhase.TRANSCRIBING -> R.string.screen_assistant_input_transcribing
             TalkActivity.InputPhase.UNKNOWN -> R.string.screen_assistant_input_unknown
+        }
         }
         Text(stringResource(inputLabel), style = ElementTheme.typography.fontBodySmRegular)
         val workLabel = when {

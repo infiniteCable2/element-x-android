@@ -50,7 +50,9 @@ internal fun ElementCallSnapshot.toVoiceState(
     val own = ownTile
     if (connection !is ElementCallConnection.Connected || own?.connection != MatrixRtcConnectionState.CONNECTED || peer == null ||
         listOfNotNull(frameEncryption[own.id.memberId], frameEncryption[peer.id.memberId]).any { it != MatrixRtcFrameEncryptionState.OK }
-    ) return AssistantVoiceState(AssistantVoicePhase.Connecting, isMicrophoneMuted)
+    ) {
+        return AssistantVoiceState(AssistantVoicePhase.Connecting, isMicrophoneMuted)
+    }
 
     val talk = talkStates[AssistantVoicePeer(peer.userId.value, checkNotNull(peer.deviceId), peer.id.memberId)]
     val activity = talk?.activity
