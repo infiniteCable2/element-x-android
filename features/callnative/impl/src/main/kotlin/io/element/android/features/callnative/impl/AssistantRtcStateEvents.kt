@@ -25,6 +25,7 @@ data class AssistantVoicePeer(val userId: String, val deviceId: String, val memb
 interface AssistantVoiceAttempt : AutoCloseable {
     val readyPeers: StateFlow<Set<AssistantVoicePeer>>
     val captions: StateFlow<List<AssistantVoiceCaption>>
+    val talkStates: StateFlow<Map<AssistantVoicePeer, TalkSessionState>>
 }
 
 data class AssistantVoiceCaption(val sequence: Long, val role: Role, val text: String) {
@@ -40,7 +41,7 @@ internal class AssistantRtcStateEvents(
     private val userId: String,
     private val nowMs: () -> ULong = { System.currentTimeMillis().toULong() },
 ) : MatrixRtcApplicationEvents {
-    override val toDeviceEventTypes = setOf(CAPTION_TYPE)
+    override val toDeviceEventTypes = setOf(CAPTION_TYPE, TALK_TYPE)
     private var current: Attempt? = null
 
     @Synchronized
@@ -63,6 +64,7 @@ internal class AssistantRtcStateEvents(
             attempt.mutableReadyPeers.value = emptySet()
             attempt.captionDevices = emptySet()
             attempt.clearCaptions()
+            attempt.talk.clear()
         }
         val marker = buildJsonObject {
             (content[NAMESPACE] as? JsonObject)?.forEach { (key, value) -> put(key, value) }
@@ -70,6 +72,7 @@ internal class AssistantRtcStateEvents(
             put("purpose", PURPOSE)
             put("request_id", attempt.requestId)
             put("captions", true)
+            put("talk_events", true)
         }
         return JsonObject(content + (NAMESPACE to marker)).toString()
     }
@@ -100,26 +103,41 @@ internal class AssistantRtcStateEvents(
                 replyTo.string("device_id") != caller.deviceId ||
                 replyTo.string("member_id") != caller.memberId
             ) return@mapNotNull null
-            AssistantVoicePeer(event.sender, deviceId, content.memberId(event.sender, deviceId)) to (marker["captions"] == JsonPrimitive(true))
+            val talkSession = marker.string("talk_session_id")?.takeIf { it.isNotBlank() && it.length <= 256 }
+                ?.takeIf { marker["talk_events"] == JsonPrimitive(true) }
+            Triple(
+                AssistantVoicePeer(event.sender, deviceId, content.memberId(event.sender, deviceId)),
+                marker["captions"] == JsonPrimitive(true),
+                talkSession,
+            )
         }
-        val captionDevices = ready.filter { (_, offersCaptions) -> offersCaptions }.mapTo(mutableSetOf()) { (peer, _) -> peer.deviceId }
+        val captionDevices = ready.filter { (_, offersCaptions, _) -> offersCaptions }.mapTo(mutableSetOf()) { (peer, _, _) -> peer.deviceId }
         if (!captionDevices.containsAll(attempt.captionDevices)) attempt.clearCaptions()
         attempt.captionDevices = captionDevices
-        attempt.mutableReadyPeers.value = ready.mapTo(mutableSetOf()) { (peer, _) -> peer }
+        attempt.talk.updateOffers(
+            ready.mapNotNull { (peer, _, session) -> session?.let { peer to it } }.toMap(),
+            ready.mapTo(mutableSetOf()) { (peer, _, _) -> peer.deviceId },
+        )
+        attempt.mutableReadyPeers.value = ready.mapTo(mutableSetOf()) { (peer, _, _) -> peer }
         attempt.publishCaptions()
     }
 
     @Synchronized
     override fun receivedToDevice(event: FfiToDeviceMessageIn) {
         val attempt = current?.takeIf { it.caller != null && it.peerId == event.sender } ?: return
-        if (event.eventType != CAPTION_TYPE || !event.encryption.encrypted || event.encryption.senderConfirmed != true) return
+        if (event.eventType !in toDeviceEventTypes || !event.encryption.encrypted || event.encryption.senderConfirmed != true) return
         val deviceId = event.encryption.senderDeviceId ?: return
-        if (attempt.readyPeers.value.any { it.deviceId == deviceId } && deviceId !in attempt.captionDevices) return
         if (event.contentJson.length > MAX_CAPTION_JSON) return
         val payload = parseObject(event.contentJson) ?: return
         if (payload["version"] != JsonPrimitive(VERSION) ||
             payload.string("room_id") != attempt.roomId || payload.string("request_id") != attempt.requestId
         ) return
+        if (event.eventType == TALK_TYPE) {
+            val talk = (payload["event"] as? JsonObject)?.parseTalkEvent() ?: return
+            attempt.talk.receive(deviceId, talk)
+            return
+        }
+        if (attempt.readyPeers.value.any { it.deviceId == deviceId } && deviceId !in attempt.captionDevices) return
         val sequence = payload.unsigned("seq")?.takeIf { it in 1uL..Long.MAX_VALUE.toULong() }?.toLong() ?: return
         val role = when (payload.string("role")) {
             "user" -> AssistantVoiceCaption.Role.User
@@ -135,6 +153,7 @@ internal class AssistantRtcStateEvents(
         if (current === attempt) current = null
         attempt.mutableReadyPeers.value = emptySet()
         attempt.clearCaptions()
+        attempt.talk.clear()
     }
 
     private inner class Attempt(val roomId: String, val peerId: String) : AssistantVoiceAttempt {
@@ -142,6 +161,8 @@ internal class AssistantRtcStateEvents(
         var caller: AssistantVoicePeer? = null
         val mutableReadyPeers = MutableStateFlow<Set<AssistantVoicePeer>>(emptySet())
         override val readyPeers = mutableReadyPeers.asStateFlow()
+        val talk = AssistantTalkEvents()
+        override val talkStates = talk.states
         var captionDevices: Set<String> = emptySet()
         private val mutableCaptions = MutableStateFlow<List<AssistantVoiceCaption>>(emptyList())
         override val captions = mutableCaptions.asStateFlow()
@@ -179,6 +200,7 @@ private const val VERSION = 1
 private const val PURPOSE = "assistant-voice"
 private const val DEFAULT_EXPIRES_MS = 14_400_000uL
 private const val CAPTION_TYPE = "$NAMESPACE.caption"
+private const val TALK_TYPE = "$NAMESPACE.talk"
 private const val MAX_CAPTIONS = 128
 private const val MAX_CAPTION_CHARS = 2_048
 private const val MAX_CAPTION_JSON = 16_384

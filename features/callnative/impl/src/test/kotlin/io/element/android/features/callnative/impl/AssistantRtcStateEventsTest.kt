@@ -31,6 +31,7 @@ class AssistantRtcStateEventsTest {
         val request = marker.getValue("request_id").jsonPrimitive.content
         assertThat(UUID.fromString(request).version()).isEqualTo(4)
         assertThat(marker["captions"]).isEqualTo(JsonPrimitive(true))
+        assertThat(marker["talk_events"]).isEqualTo(JsonPrimitive(true))
         assertThat(marker["existing"]?.jsonPrimitive?.content).isEqualTo("preserved")
         assertThat(JsonObject(join - NAMESPACE)).isEqualTo(JsonObject(Json.parseToJsonElement(JOIN).jsonObject - NAMESPACE))
         assertThat(requestId()).isEqualTo(request)
@@ -133,6 +134,69 @@ class AssistantRtcStateEventsTest {
         assertThat(attempt.captions.value).isEmpty()
     }
 
+    @Test
+    fun `talk activity waits for the exact ready device session and explicit offer`() {
+        val attempt = checkNotNull(events.begin(ROOM, PEER))
+        val id = requestId()
+        events.receivedToDevice(talk(id, talkActivityEvent(2)))
+        assertThat(attempt.talkStates.value).isEmpty()
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersTalk = "talk-session")))
+        assertThat(attempt.talkStates.value.values.single().activity?.input?.phase).isEqualTo(TalkActivity.InputPhase.SPEECH)
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(id)))
+        assertThat(attempt.talkStates.value).isEmpty()
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersTalk = "talk-session")))
+        assertThat(attempt.talkStates.value.values.single().activity).isNull()
+        events.receivedToDevice(talk(id, talkActivityEvent(2)))
+        assertThat(attempt.talkStates.value.values.single().activity).isNull()
+        events.receivedToDevice(talk(id, talkActivityEvent(100)))
+        assertThat(attempt.talkStates.value.values.single().sequence).isEqualTo(100)
+        assertThat(attempt.talkStates.value.values.single().activity).isNotNull()
+    }
+
+    @Test
+    fun `talk rejects unauthenticated devices other sessions and old invocation envelopes`() {
+        val attempt = checkNotNull(events.begin(ROOM, PEER))
+        val id = requestId()
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersTalk = "talk-session")))
+        val valid = talk(id, talkActivityEvent(1))
+        val anotherSession = JsonObject(talkActivityEvent(1) + ("sessionId" to JsonPrimitive("other-session")))
+        listOf(
+            valid.copy(sender = "@other:example.org"),
+            valid.copy(encryption = valid.encryption.copy(senderDeviceId = "OTHER")),
+            valid.copy(encryption = valid.encryption.copy(senderDeviceId = null)),
+            valid.copy(encryption = valid.encryption.copy(senderConfirmed = false)),
+            valid.copy(encryption = valid.encryption.copy(encrypted = false)),
+            talk("old-request", talkActivityEvent(1)),
+            talk(id, talkActivityEvent(1), room = OTHER_ROOM),
+            talk(id, anotherSession),
+        ).forEach(events::receivedToDevice)
+        assertThat(attempt.talkStates.value.values.single().activity).isNull()
+        events.receivedToDevice(valid)
+        assertThat(attempt.talkStates.value.values.single().activity).isNotNull()
+        attempt.close()
+        assertThat(attempt.talkStates.value).isEmpty()
+        val next = checkNotNull(events.begin(ROOM, PEER))
+        val nextId = requestId()
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(nextId, offersTalk = "talk-session")))
+        events.receivedToDevice(valid)
+        assertThat(next.talkStates.value.values.single().activity).isNull()
+    }
+
+    @Test
+    fun `talk coalesces pre ready activity and deduplicates IDs independently of sequence gaps`() {
+        val attempt = checkNotNull(events.begin(ROOM, PEER))
+        val id = requestId()
+        for (seq in 1L..200L) events.receivedToDevice(talk(id, talkActivityEvent(seq)))
+        events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersTalk = "talk-session")))
+        assertThat(attempt.talkStates.value.values.single().sequence).isEqualTo(200)
+        val duplicateId = JsonObject(talkActivityEvent(200) + ("seq" to JsonPrimitive(300)))
+        events.receivedToDevice(talk(id, duplicateId))
+        assertThat(attempt.talkStates.value.values.single().sequence).isEqualTo(200)
+        val invalidPayload = JsonObject(talkActivityEvent(400) + ("payload" to JsonPrimitive("unsupported")))
+        events.receivedToDevice(talk(id, invalidPayload))
+        assertThat(attempt.talkStates.value.values.single().activity).isNull()
+    }
+
     private fun requestId() = Json.parseToJsonElement(outgoing()).jsonObject.getValue(NAMESPACE)
         .jsonObject.getValue("request_id").jsonPrimitive.content
 
@@ -146,6 +210,13 @@ class AssistantRtcStateEventsTest {
         encryption = FfiEventEncryption(encrypted = true, senderDeviceId = PEER_DEVICE, senderConfirmed = true),
     )
 
+    private fun talk(request: String, event: JsonObject, room: String = ROOM) = FfiToDeviceMessageIn(
+        sender = PEER,
+        eventType = "$NAMESPACE.talk",
+        contentJson = """{"version":1,"room_id":"$room","request_id":"$request","event":$event}""",
+        encryption = FfiEventEncryption(encrypted = true, senderDeviceId = PEER_DEVICE, senderConfirmed = true),
+    )
+
     private fun reply(
         request: String,
         state: String = "ready",
@@ -155,6 +226,7 @@ class AssistantRtcStateEventsTest {
         callId: String = "",
         origin: ULong = NOW,
         offersCaptions: Boolean? = null,
+        offersTalk: String? = null,
     ) = FfiEventIn(
         eventId = "\$ready",
         sender = sender,
@@ -165,6 +237,7 @@ class AssistantRtcStateEventsTest {
             {"application":"m.call","scope":"m.room","call_id":"$callId","device_id":"$PEER_DEVICE","expires":60000,
              "$NAMESPACE":{"version":1,"purpose":"assistant-voice","request_id":"$request","state":"$state",
              ${offersCaptions?.let { """"captions":$it,""" }.orEmpty()}
+             ${offersTalk?.let { """"talk_events":true,"talk_session_id":"$it",""" }.orEmpty()}
              "caller":{"user_id":"$CALLER","device_id":"$callerDevice","member_id":"$callerMember"}}}
         """.trimIndent(),
         encryption = FfiEventEncryption(encrypted = false, senderDeviceId = null, senderConfirmed = null),
