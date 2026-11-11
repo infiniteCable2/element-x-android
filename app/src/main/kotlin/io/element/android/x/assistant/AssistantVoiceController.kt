@@ -20,13 +20,10 @@ import dev.zacsweers.metro.SingleIn
 import io.element.android.call.api.ElementCallConnection
 import io.element.android.call.api.ElementCallController
 import io.element.android.call.api.ElementCallData
-import io.element.android.call.api.ElementCallSnapshot
-import io.element.android.call.api.rtc.MatrixRtcConnectionState
 import io.element.android.call.api.rtc.id.RoomId
 import io.element.android.features.call.api.CurrentCall
 import io.element.android.features.call.api.CurrentCallService
 import io.element.android.features.callnative.impl.AssistantVoiceCaption
-import io.element.android.features.callnative.impl.AssistantVoicePeer
 import io.element.android.features.callnative.impl.ElementCallControllers
 import io.element.android.features.lockscreen.api.LockScreenService
 import io.element.android.libraries.di.annotations.AppCoroutineScope
@@ -43,22 +40,12 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.time.Duration.Companion.seconds
-
-internal enum class AssistantVoicePhase {
-    Connecting, Listening, Speaking, Replying, Muted, Ended, OpenChat, NotConfigured, Locked, Permission, DirectChatRequired, Busy, Failed,
-}
-
-internal data class AssistantVoiceState(
-    val phase: AssistantVoicePhase = AssistantVoicePhase.Connecting,
-    val muted: Boolean = false,
-    val level: Float = 0f,
-)
 
 /** The call belongs to the app, so hiding or recreating the system overlay leaves it running. */
 @SingleIn(AppScope::class)
@@ -159,12 +146,13 @@ class AssistantVoiceController(
             }
             var signalled = false
             try {
-                combine(call.state, attempt.readyPeers) { snapshot, readyPeers ->
+                combine(call.state, attempt.readyPeers, attempt.talkStates) { snapshot, readyPeers, talkStates ->
                     when {
                         snapshot == null || snapshot.callData.roomId != roomId -> AssistantVoiceState(AssistantVoicePhase.Ended)
                         snapshot.connection is ElementCallConnection.Ended -> AssistantVoiceState(AssistantVoicePhase.Ended)
                         snapshot.connection is ElementCallConnection.Failed -> AssistantVoiceState(AssistantVoicePhase.Failed)
-                        else -> snapshot.toVoiceState(readyPeers)
+                        snapshot.connection is ElementCallConnection.RingNotSent -> AssistantVoiceState(AssistantVoicePhase.Failed)
+                        else -> snapshot.toVoiceState(readyPeers, talkStates)
                     }
                 }.first {
                     mutableState.value = it
@@ -220,26 +208,5 @@ class AssistantVoiceController(
     }
 }
 
-private val readyPhases = setOf(AssistantVoicePhase.Listening, AssistantVoicePhase.Speaking, AssistantVoicePhase.Replying, AssistantVoicePhase.Muted)
+private val readyPhases = setOf(AssistantVoicePhase.Connected, AssistantVoicePhase.Muted)
 private val terminalPhases = setOf(AssistantVoicePhase.Ended, AssistantVoicePhase.Failed)
-private const val SPEECH_LEVEL = 0.025f
-
-internal fun ElementCallSnapshot.toVoiceState(readyPeers: Set<AssistantVoicePeer>): AssistantVoiceState {
-    val peer = roster.ranked.firstOrNull {
-        val deviceId = it.deviceId
-        it.connection == MatrixRtcConnectionState.CONNECTED && deviceId != null &&
-            AssistantVoicePeer(it.userId.value, deviceId, it.id.memberId) in readyPeers
-    }
-    if (connection !is ElementCallConnection.Connected || peer == null) {
-        return AssistantVoiceState(AssistantVoicePhase.Connecting, isMicrophoneMuted)
-    }
-    val local = if (isMicrophoneMuted) 0f else ownTile?.id?.memberId?.let(audioLevels::get)?.level ?: 0f
-    val remote = audioLevels[peer.id.memberId]?.level ?: 0f
-    val phase = when {
-        local >= SPEECH_LEVEL -> AssistantVoicePhase.Speaking
-        remote >= SPEECH_LEVEL -> AssistantVoicePhase.Replying
-        isMicrophoneMuted -> AssistantVoicePhase.Muted
-        else -> AssistantVoicePhase.Listening
-    }
-    return AssistantVoiceState(phase, isMicrophoneMuted, maxOf(local, remote).coerceIn(0f, 1f))
-}

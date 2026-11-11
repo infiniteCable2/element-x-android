@@ -34,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import io.element.android.compound.theme.ElementTheme
 import io.element.android.compound.tokens.generated.CompoundIcons
 import io.element.android.features.callnative.impl.AssistantVoiceCaption
+import io.element.android.features.callnative.impl.TalkActivity
+import io.element.android.features.callnative.impl.TalkInputOutcome
 import io.element.android.libraries.designsystem.preview.ElementPreview
 import io.element.android.libraries.designsystem.preview.PreviewsDayNight
 import io.element.android.libraries.designsystem.theme.components.Icon
@@ -53,8 +55,9 @@ internal fun AssistantVoiceBar(
 ) {
     val phase = state.phase
     val callActive = phase in setOf(
-        AssistantVoicePhase.Connecting, AssistantVoicePhase.Listening, AssistantVoicePhase.Speaking,
-        AssistantVoicePhase.Replying, AssistantVoicePhase.Muted,
+        AssistantVoicePhase.Connecting,
+        AssistantVoicePhase.Connected,
+        AssistantVoicePhase.Muted,
     )
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -85,6 +88,7 @@ internal fun AssistantVoiceBar(
                 }
             }
             if (callActive) {
+                state.activity?.let { AssistantActivity(it, state.inputOutcome) }
                 if (captions.isNotEmpty()) AssistantTranscript(captions)
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                     TextButton(
@@ -97,6 +101,46 @@ internal fun AssistantVoiceBar(
             } else if (phase == AssistantVoicePhase.OpenChat) {
                 TextButton(text = stringResource(R.string.screen_assistant_chat_open), onClick = onOpenChat)
             }
+        }
+    }
+}
+
+@Composable
+private fun AssistantActivity(activity: TalkActivity, outcome: TalkInputOutcome?) {
+    Column(Modifier.padding(vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val inputLabel = if (!activity.input.available) R.string.screen_assistant_input_unavailable else when (activity.input.phase) {
+            TalkActivity.InputPhase.LISTENING -> R.string.screen_assistant_voice_listening
+            TalkActivity.InputPhase.RECEIVING -> R.string.screen_assistant_input_receiving
+            TalkActivity.InputPhase.CANDIDATE -> R.string.screen_assistant_input_candidate
+            TalkActivity.InputPhase.SPEECH -> R.string.screen_assistant_input_speech
+            TalkActivity.InputPhase.TRANSCRIBING -> R.string.screen_assistant_input_transcribing
+            TalkActivity.InputPhase.UNKNOWN -> R.string.screen_assistant_input_unknown
+        }
+        Text(stringResource(inputLabel), style = ElementTheme.typography.fontBodySmRegular)
+        val workLabel = when {
+            activity.work.running > 0 -> R.string.screen_assistant_work_running
+            activity.work.queued > 0 -> R.string.screen_assistant_work_queued
+            activity.work.pending > 0 -> R.string.screen_assistant_work_pending
+            else -> R.string.screen_assistant_work_idle
+        }
+        Text(stringResource(workLabel), style = ElementTheme.typography.fontBodySmRegular)
+        val outputLabel = when (activity.output.state) {
+            TalkActivity.OutputState.IDLE -> R.string.screen_assistant_output_idle
+            TalkActivity.OutputState.PREPARING -> R.string.screen_assistant_output_preparing
+            TalkActivity.OutputState.STREAMING -> R.string.screen_assistant_output_streaming
+            TalkActivity.OutputState.SUBMITTED -> R.string.screen_assistant_output_submitted
+        }
+        Text(stringResource(outputLabel), style = ElementTheme.typography.fontBodySmRegular)
+        outcome?.let {
+            val label = when (it.outcome) {
+                TalkInputOutcome.Outcome.NO_INPUT -> R.string.screen_assistant_outcome_no_input
+                TalkInputOutcome.Outcome.REJECTED -> R.string.screen_assistant_outcome_rejected
+                TalkInputOutcome.Outcome.TRANSCRIBED -> R.string.screen_assistant_outcome_transcribed
+                TalkInputOutcome.Outcome.FAILED -> R.string.screen_assistant_outcome_failed
+                TalkInputOutcome.Outcome.CANCELLED -> R.string.screen_assistant_outcome_cancelled
+                TalkInputOutcome.Outcome.UNKNOWN -> R.string.screen_assistant_input_unknown
+            }
+            Text(stringResource(label), style = ElementTheme.typography.fontBodySmRegular, color = ElementTheme.colors.textSecondary)
         }
     }
 }
@@ -143,9 +187,9 @@ private fun AssistantTranscript(captions: List<AssistantVoiceCaption>) {
 @Composable
 private fun VoiceLevel(state: AssistantVoiceState) {
     val level by animateFloatAsState(state.level, label = "Voice level")
-    val colour = when (state.phase) {
-        AssistantVoicePhase.Speaking -> ElementTheme.colors.textPrimary
-        AssistantVoicePhase.Replying -> ElementTheme.colors.bgActionPrimaryRest
+    val colour = when {
+        state.activity?.output?.state == TalkActivity.OutputState.STREAMING -> ElementTheme.colors.bgActionPrimaryRest
+        state.activity?.input?.phase == TalkActivity.InputPhase.SPEECH -> ElementTheme.colors.textPrimary
         else -> ElementTheme.colors.textSecondary
     }
     Canvas(Modifier.size(width = 36.dp, height = 28.dp)) {
@@ -166,9 +210,7 @@ private fun VoiceLevel(state: AssistantVoiceState) {
 
 private fun AssistantVoicePhase.label() = when (this) {
     AssistantVoicePhase.Connecting -> R.string.screen_assistant_voice_connecting
-    AssistantVoicePhase.Listening -> R.string.screen_assistant_voice_listening
-    AssistantVoicePhase.Speaking -> R.string.screen_assistant_voice_speaking
-    AssistantVoicePhase.Replying -> R.string.screen_assistant_voice_replying
+    AssistantVoicePhase.Connected -> R.string.screen_assistant_voice_connected
     AssistantVoicePhase.Muted -> R.string.screen_assistant_voice_muted
     AssistantVoicePhase.Ended -> R.string.screen_assistant_voice_ended
     AssistantVoicePhase.OpenChat -> R.string.screen_assistant_chat_ready
@@ -196,7 +238,7 @@ private fun AssistantVoicePreview(@PreviewParameter(AssistantVoicePreviewStates:
 @Composable
 private fun AssistantVoiceTranscriptPreview() = ElementPreview {
     AssistantVoiceBar(
-        state = AssistantVoiceState(AssistantVoicePhase.Replying),
+        state = AssistantVoiceState(AssistantVoicePhase.Connected),
         captions = listOf(
             AssistantVoiceCaption(1, AssistantVoiceCaption.Role.User, "What can I make with carrots and potatoes?"),
             AssistantVoiceCaption(2, AssistantVoiceCaption.Role.Assistant, "You could make a simple soup with both."),
@@ -206,4 +248,31 @@ private fun AssistantVoiceTranscriptPreview() = ElementPreview {
         onHide = {},
         onOpenChat = {},
     )
+}
+
+internal class AssistantActivityPreviewStates : PreviewParameterProvider<AssistantVoiceState> {
+    private val activity = TalkActivity(
+        connection = TalkActivity.Connection.READY,
+        input = TalkActivity.Input(TalkActivity.InputPhase.LISTENING, true, 0, "capture", null),
+        work = TalkActivity.Work(2, 1, 1),
+        output = TalkActivity.Output(1, TalkActivity.OutputState.IDLE, null),
+    )
+    override val values = sequence {
+        for (phase in TalkActivity.InputPhase.entries) yield(activity.copy(input = activity.input.copy(phase = phase)))
+        for (state in TalkActivity.OutputState.entries) yield(activity.copy(output = activity.output.copy(state = state)))
+        yield(activity.copy(input = activity.input.copy(available = false)))
+    }.map { AssistantVoiceState(AssistantVoicePhase.Connected, activity = it, level = 0.65f) } +
+        TalkInputOutcome.Outcome.entries.asSequence().map {
+            AssistantVoiceState(
+                AssistantVoicePhase.Connected,
+                activity = activity,
+                inputOutcome = TalkInputOutcome("capture", TalkInputOutcome.Scope.CAPTURE, it, null),
+            )
+        }
+}
+
+@PreviewsDayNight
+@Composable
+private fun AssistantActivityPreview(@PreviewParameter(AssistantActivityPreviewStates::class) state: AssistantVoiceState) = ElementPreview {
+    AssistantVoiceBar(state, captions = emptyList(), onMute = {}, onHangUp = {}, onHide = {}, onOpenChat = {})
 }
