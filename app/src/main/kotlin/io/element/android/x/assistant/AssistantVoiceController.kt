@@ -146,13 +146,13 @@ class AssistantVoiceController(
             }
             var signalled = false
             try {
-                combine(call.state, attempt.readyPeers, attempt.talkStates) { snapshot, readyPeers, talkStates ->
+                combine(call.state, attempt.presentation) { snapshot, presentation ->
                     when {
                         snapshot == null || snapshot.callData.roomId != roomId -> AssistantVoiceState(AssistantVoicePhase.Ended)
                         snapshot.connection is ElementCallConnection.Ended -> AssistantVoiceState(AssistantVoicePhase.Ended)
                         snapshot.connection is ElementCallConnection.Failed -> AssistantVoiceState(AssistantVoicePhase.Failed)
                         snapshot.connection is ElementCallConnection.RingNotSent -> AssistantVoiceState(AssistantVoicePhase.Failed)
-                        else -> snapshot.toVoiceState(readyPeers, talkStates)
+                        else -> snapshot.toVoiceState(presentation.readyPeers, presentation.talkStates)
                     }
                 }.first {
                     mutableState.value = it

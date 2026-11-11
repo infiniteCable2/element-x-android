@@ -5,12 +5,14 @@
 
 package io.element.android.features.callnative.impl
 
+import app.cash.turbine.test
 import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.matrix.rtc.FfiEventEncryption
 import org.matrix.rtc.FfiEventIn
@@ -142,6 +144,8 @@ class AssistantRtcStateEventsTest {
         assertThat(attempt.talkStates.value).isEmpty()
         events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersTalk = "talk-session")))
         assertThat(attempt.talkStates.value.values.single().activity?.input?.phase).isEqualTo(TalkActivity.InputPhase.SPEECH)
+        assertThat(attempt.presentation.value.readyPeers).isEqualTo(attempt.readyPeers.value)
+        assertThat(attempt.presentation.value.talkStates).isEqualTo(attempt.talkStates.value)
         events.received(ROOM, MEMBER_TYPE, listOf(reply(id)))
         assertThat(attempt.talkStates.value).isEmpty()
         events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersTalk = "talk-session")))
@@ -151,6 +155,8 @@ class AssistantRtcStateEventsTest {
         events.receivedToDevice(talk(id, talkActivityEvent(100)))
         assertThat(attempt.talkStates.value.values.single().sequence).isEqualTo(100)
         assertThat(attempt.talkStates.value.values.single().activity).isNotNull()
+        events.received(ROOM, MEMBER_TYPE, emptyList())
+        assertThat(attempt.presentation.value).isEqualTo(AssistantVoicePresentation())
     }
 
     @Test
@@ -195,6 +201,30 @@ class AssistantRtcStateEventsTest {
         val invalidPayload = JsonObject(talkActivityEvent(400) + ("payload" to JsonPrimitive("unsupported")))
         events.receivedToDevice(talk(id, invalidPayload))
         assertThat(attempt.talkStates.value.values.single().activity).isNull()
+    }
+
+    @Test
+    fun `readiness and talk status are published together through withdrawal`() = runTest {
+        val attempt = checkNotNull(events.begin(ROOM, PEER))
+        val id = requestId()
+        attempt.presentation.test {
+            assertThat(awaitItem()).isEqualTo(AssistantVoicePresentation())
+            events.receivedToDevice(talk(id, talkActivityEvent(1)))
+            expectNoEvents()
+            events.received(ROOM, MEMBER_TYPE, listOf(reply(id, offersTalk = "talk-session")))
+            val ready = awaitItem()
+            assertThat(ready.readyPeers).isNotEmpty()
+            assertThat(ready.talkStates.values.single().activity).isNotNull()
+            expectNoEvents()
+            events.received(ROOM, MEMBER_TYPE, listOf(reply(id)))
+            val withdrawn = awaitItem()
+            assertThat(withdrawn.readyPeers).isNotEmpty()
+            assertThat(withdrawn.talkStates).isEmpty()
+            expectNoEvents()
+            events.received(ROOM, MEMBER_TYPE, emptyList())
+            assertThat(awaitItem()).isEqualTo(AssistantVoicePresentation())
+            expectNoEvents()
+        }
     }
 
     private fun requestId() = Json.parseToJsonElement(outgoing()).jsonObject.getValue(NAMESPACE)

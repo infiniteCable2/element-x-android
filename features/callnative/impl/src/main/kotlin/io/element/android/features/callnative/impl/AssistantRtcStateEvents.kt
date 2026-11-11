@@ -22,10 +22,16 @@ import java.util.UUID
 /** Matches the same peer identity as the active native call roster. */
 data class AssistantVoicePeer(val userId: String, val deviceId: String, val memberId: String)
 
+data class AssistantVoicePresentation(
+    val readyPeers: Set<AssistantVoicePeer> = emptySet(),
+    val talkStates: Map<AssistantVoicePeer, TalkSessionState> = emptyMap(),
+)
+
 interface AssistantVoiceAttempt : AutoCloseable {
     val readyPeers: StateFlow<Set<AssistantVoicePeer>>
     val captions: StateFlow<List<AssistantVoiceCaption>>
     val talkStates: StateFlow<Map<AssistantVoicePeer, TalkSessionState>>
+    val presentation: StateFlow<AssistantVoicePresentation>
 }
 
 data class AssistantVoiceCaption(val sequence: Long, val role: Role, val text: String) {
@@ -65,6 +71,7 @@ internal class AssistantRtcStateEvents(
             attempt.captionDevices = emptySet()
             attempt.clearCaptions()
             attempt.talk.clear()
+            attempt.publishPresentation()
         }
         val marker = buildJsonObject {
             (content[NAMESPACE] as? JsonObject)?.forEach { (key, value) -> put(key, value) }
@@ -119,6 +126,7 @@ internal class AssistantRtcStateEvents(
             ready.mapTo(mutableSetOf()) { (peer, _, _) -> peer.deviceId },
         )
         attempt.mutableReadyPeers.value = ready.mapTo(mutableSetOf()) { (peer, _, _) -> peer }
+        attempt.publishPresentation()
         attempt.publishCaptions()
     }
 
@@ -135,6 +143,7 @@ internal class AssistantRtcStateEvents(
         if (event.eventType == TALK_TYPE) {
             val talk = (payload["event"] as? JsonObject)?.parseTalkEvent() ?: return
             attempt.talk.receive(deviceId, talk)
+            attempt.publishPresentation()
             return
         }
         if (attempt.readyPeers.value.any { it.deviceId == deviceId } && deviceId !in attempt.captionDevices) return
@@ -154,6 +163,7 @@ internal class AssistantRtcStateEvents(
         attempt.mutableReadyPeers.value = emptySet()
         attempt.clearCaptions()
         attempt.talk.clear()
+        attempt.publishPresentation()
     }
 
     private inner class Attempt(val roomId: String, val peerId: String) : AssistantVoiceAttempt {
@@ -163,6 +173,12 @@ internal class AssistantRtcStateEvents(
         override val readyPeers = mutableReadyPeers.asStateFlow()
         val talk = AssistantTalkEvents()
         override val talkStates = talk.states
+        private val mutablePresentation = MutableStateFlow(AssistantVoicePresentation())
+        override val presentation = mutablePresentation.asStateFlow()
+
+        fun publishPresentation() {
+            mutablePresentation.value = AssistantVoicePresentation(readyPeers.value, talkStates.value)
+        }
         var captionDevices: Set<String> = emptySet()
         private val mutableCaptions = MutableStateFlow<List<AssistantVoiceCaption>>(emptyList())
         override val captions = mutableCaptions.asStateFlow()
