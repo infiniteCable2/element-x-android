@@ -101,7 +101,10 @@ internal fun TalkSessionState?.accept(event: TalkEvent): TalkSessionState? {
 
 private fun JsonObject.parseOutcome(captureId: String?): TalkInputOutcome? {
     if (captureId == null || !validOptionalIdentifiers("utteranceId")) return null
-    return TalkInputOutcome(captureId, wireEnum("scope") ?: return null, wireEnum("outcome") ?: return null, identifier("utteranceId"))
+    val scope = wireEnum<TalkInputOutcome.Scope>("scope") ?: return null
+    val utteranceId = identifier("utteranceId")
+    if (scope == TalkInputOutcome.Scope.UTTERANCE && utteranceId == null) return null
+    return TalkInputOutcome(captureId, scope, wireEnum("outcome") ?: return null, utteranceId)
 }
 
 private fun JsonObject.parseActivity(): TalkActivity? {

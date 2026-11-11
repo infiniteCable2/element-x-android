@@ -84,6 +84,25 @@ class TalkActivityTest {
         assertThat(next.inputOutcome).isNull()
     }
 
+    @Test
+    fun `utterance and capture outcomes remain distinct and utterance scope needs its ID`() {
+        val activity = checkNotNull(talkActivityEvent(1).parseTalkEvent())
+        val initial = activity.copy(activity = checkNotNull(activity.activity).let {
+            it.copy(input = it.input.copy(utteranceId = "utterance-1"))
+        })
+        val state = checkNotNull(null.accept(initial))
+        val outcome = outcomeEvent(2, "capture-1")
+        val payload = JsonObject(outcome.getValue("payload").jsonObject + ("scope" to JsonPrimitive("utterance")))
+        val missingId = JsonObject(outcome + ("payload" to payload))
+        assertThat(missingId.parseTalkEvent()?.inputOutcome).isNull()
+        val utterance = JsonObject(outcome + ("payload" to JsonObject(payload + ("utteranceId" to JsonPrimitive("utterance-1")))))
+        val withUtterance = checkNotNull(state.accept(checkNotNull(utterance.parseTalkEvent())))
+        assertThat(withUtterance.inputOutcome?.scope).isEqualTo(TalkInputOutcome.Scope.UTTERANCE)
+        val withCapture = checkNotNull(withUtterance.accept(checkNotNull(outcomeEvent(3, "capture-1").parseTalkEvent())))
+        assertThat(withCapture.inputOutcome?.scope).isEqualTo(TalkInputOutcome.Scope.CAPTURE)
+        assertThat(withCapture.activity).isEqualTo(state.activity)
+    }
+
     private fun outcomeEvent(seq: Long, capture: String): JsonObject = Json.parseToJsonElement(
         """{"id":"event-$seq","type":"input.outcome","sessionId":"talk-session","seq":$seq,"timestamp":"2026-11-11T18:00:01.000Z",
            "mode":"stt-tts","transport":"managed-room","brain":"agent-consult","captureId":"$capture",
