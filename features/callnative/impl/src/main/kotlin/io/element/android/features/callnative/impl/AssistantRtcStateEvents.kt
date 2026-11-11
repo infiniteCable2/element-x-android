@@ -103,7 +103,7 @@ internal class AssistantRtcStateEvents(
                 replyTo.string("device_id") != caller.deviceId ||
                 replyTo.string("member_id") != caller.memberId
             ) return@mapNotNull null
-            val talkSession = marker.string("talk_session_id")?.takeIf { it.isNotBlank() && it.length <= 256 }
+            val talkSession = marker.string("talk_session_id")?.takeIf { it.isNotEmpty() }
                 ?.takeIf { marker["talk_events"] == JsonPrimitive(true) }
             Triple(
                 AssistantVoicePeer(event.sender, deviceId, content.memberId(event.sender, deviceId)),

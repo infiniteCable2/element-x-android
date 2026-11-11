@@ -18,12 +18,12 @@ data class TalkActivity(val connection: Connection, val input: Input, val work: 
     data class Input(
         val phase: InputPhase,
         val available: Boolean,
-        val pending: Int,
+        val pending: Long,
         val captureId: String?,
         val utteranceId: String?,
     )
 
-    data class Work(val pending: Int, val queued: Int, val running: Int)
+    data class Work(val pending: Long, val queued: Long, val running: Long)
     data class Output(val generation: Long, val state: OutputState, val purpose: OutputPurpose?)
 }
 
@@ -54,10 +54,14 @@ internal data class TalkEvent(
 /** Consume only the two status event types; captions and arbitrary provider payloads do not belong here. */
 internal fun JsonObject.parseTalkEvent(): TalkEvent? {
     val sessionId = identifier("sessionId") ?: return null
-    val sequence = nonNegative("seq") ?: return null
+    val sequence = nonNegative("seq")?.takeIf { it >= 1 } ?: return null
     val id = identifier("id") ?: return null
-    if (nonNegative("timestamp") == null ||
-        identifier("mode") == null || identifier("transport") == null || identifier("brain") == null
+    if (identifier("timestamp") == null || keys.any { it !in TALK_EVENT_FIELDS } ||
+        text("mode") !in setOf("realtime", "stt-tts", "transcription") ||
+        text("transport") !in setOf("webrtc", "provider-websocket", "gateway-relay", "managed-room") ||
+        text("brain") !in setOf("agent-consult", "direct-tools", "none") ||
+        !validOptionalIdentifiers("provider", "turnId", "captureId", "callId", "itemId", "parentId") ||
+        containsKey("final") && (get("final") != JsonPrimitive(true) && get("final") != JsonPrimitive(false))
     ) return null
     val payload = (get("payload") as? JsonObject)?.takeIf { it["version"] == JsonPrimitive(1) }
     return when (text("type")) {
@@ -116,14 +120,14 @@ private fun JsonObject.parseActivity(): TalkActivity? {
                     else -> null
                 }
             } ?: return null,
-            pending = input.count("pending") ?: return null,
+            pending = input.nonNegative("pending") ?: return null,
             captureId = input.identifier("captureId"),
             utteranceId = input.identifier("utteranceId"),
         ),
         work = TalkActivity.Work(
-            pending = work.count("pending") ?: return null,
-            queued = work.count("queued") ?: return null,
-            running = work.count("running") ?: return null,
+            pending = work.nonNegative("pending") ?: return null,
+            queued = work.nonNegative("queued") ?: return null,
+            running = work.nonNegative("running") ?: return null,
         ),
         output = TalkActivity.Output(
             generation = output.nonNegative("generation") ?: return null,
@@ -134,14 +138,17 @@ private fun JsonObject.parseActivity(): TalkActivity? {
 }
 
 private fun JsonObject.text(key: String): String? = (get(key) as? JsonPrimitive)?.takeIf { it.isString }?.content
-private fun JsonObject.identifier(key: String): String? = text(key)?.takeIf { it.isNotBlank() && it.length <= 256 }
+private fun JsonObject.identifier(key: String): String? = text(key)?.takeIf { it.isNotEmpty() }
 
 private fun JsonObject.validOptionalIdentifiers(vararg keys: String): Boolean = keys.all { !containsKey(it) || identifier(it) != null }
 
 private fun JsonObject.nonNegative(key: String): Long? =
     (get(key) as? JsonPrimitive)?.takeUnless { it.isString }?.content?.toLongOrNull()?.takeIf { it >= 0 }
 
-private fun JsonObject.count(key: String): Int? = nonNegative(key)?.takeIf { it <= Int.MAX_VALUE }?.toInt()
-
 private inline fun <reified T : Enum<T>> JsonObject.wireEnum(key: String): T? =
     enumValues<T>().firstOrNull { it.name.lowercase().replace('_', '-') == text(key) }
+
+private val TALK_EVENT_FIELDS = setOf(
+    "id", "type", "sessionId", "seq", "timestamp", "mode", "transport", "brain", "payload",
+    "provider", "turnId", "captureId", "callId", "itemId", "parentId", "final",
+)

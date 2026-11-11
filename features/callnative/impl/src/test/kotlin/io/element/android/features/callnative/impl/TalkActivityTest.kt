@@ -30,11 +30,30 @@ class TalkActivityTest {
     }
 
     @Test
+    fun `native schema fixtures allow ISO timestamps optional IDs and unbounded nonempty IDs`() {
+        val native = Json.parseToJsonElement(
+            """{"id":"sample-session:4","type":"session.activity","sessionId":"sample-session","seq":4,
+               "timestamp":"2026-11-11T18:00:00.000Z","mode":"stt-tts","transport":"managed-room","brain":"agent-consult",
+               "payload":{"version":1,"connection":"ready","input":{"phase":"listening","available":true,"pending":0},
+               "work":{"pending":0,"queued":0,"running":0},"output":{"generation":0,"state":"idle"}}}""",
+        ).jsonObject
+        assertThat(native.parseTalkEvent()?.activity?.input?.phase).isEqualTo(TalkActivity.InputPhase.LISTENING)
+        assertThat(native.parseTalkEvent()?.activity?.input?.captureId).isNull()
+        val longId = "a".repeat(512)
+        assertThat(JsonObject(native + ("sessionId" to JsonPrimitive(longId))).parseTalkEvent()?.sessionId).isEqualTo(longId)
+    }
+
+    @Test
     fun `malformed fields and non status events are rejected`() {
         val valid = talkActivityEvent(1)
         listOf(
             JsonObject(valid + ("seq" to JsonPrimitive(-1))),
+            JsonObject(valid + ("seq" to JsonPrimitive(0))),
             JsonObject(valid + ("seq" to JsonPrimitive("1"))),
+            JsonObject(valid + ("timestamp" to JsonPrimitive(1000))),
+            JsonObject(valid + ("transport" to JsonPrimitive("matrix"))),
+            JsonObject(valid + ("brain" to JsonPrimitive("agent"))),
+            JsonObject(valid + ("unknown" to JsonPrimitive(true))),
             JsonObject(valid - "sessionId"),
             JsonObject(valid + ("type" to JsonPrimitive("output.text"))),
         ).forEach { assertThat(it.parseTalkEvent()).isNull() }
@@ -66,15 +85,15 @@ class TalkActivityTest {
     }
 
     private fun outcomeEvent(seq: Long, capture: String): JsonObject = Json.parseToJsonElement(
-        """{"id":"event-$seq","type":"input.outcome","sessionId":"talk-session","seq":$seq,"timestamp":1000,
-           "mode":"realtime","transport":"matrix","brain":"agent","captureId":"$capture",
+        """{"id":"event-$seq","type":"input.outcome","sessionId":"talk-session","seq":$seq,"timestamp":"2026-11-11T18:00:01.000Z",
+           "mode":"stt-tts","transport":"managed-room","brain":"agent-consult","captureId":"$capture",
            "payload":{"version":1,"scope":"capture","outcome":"no-input"}}""",
     ).jsonObject
 }
 
 internal fun talkActivityEvent(seq: Long, capture: String = "capture-1", output: String = "submitted"): JsonObject = Json.parseToJsonElement(
-    """{"id":"event-$seq","type":"session.activity","sessionId":"talk-session","seq":$seq,"timestamp":1000,
-       "mode":"realtime","transport":"matrix","brain":"agent","payload":{"version":1,"connection":"ready",
+    """{"id":"event-$seq","type":"session.activity","sessionId":"talk-session","seq":$seq,"timestamp":"2026-11-11T18:00:00.000Z",
+       "mode":"stt-tts","transport":"managed-room","brain":"agent-consult","payload":{"version":1,"connection":"ready",
        "input":{"phase":"speech","available":true,"captureId":"$capture","pending":0},
        "work":{"pending":2,"queued":1,"running":1},"output":{"generation":1,"state":"$output","purpose":"speech"}}}""",
 ).jsonObject
