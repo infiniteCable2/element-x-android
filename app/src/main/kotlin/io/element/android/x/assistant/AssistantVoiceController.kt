@@ -151,6 +151,9 @@ class AssistantVoiceController(
             controllers.setStartingFromAssistant(null)
             call.setMicrophonePermissionGranted(true)
 
+            val audioRouteJob = scope.launch(Dispatchers.Main.immediate) {
+                call.followAssistantAudioRoute(roomId)
+            }
             val captionJob = scope.launch(Dispatchers.Main.immediate) {
                 attempt.captions.collect { mutableCaptions.value = it }
             }
@@ -172,6 +175,7 @@ class AssistantVoiceController(
                     it.phase in terminalPhases
                 }
             } finally {
+                audioRouteJob.cancel()
                 captionJob.cancel()
             }
         } finally {
