@@ -68,6 +68,8 @@ private class AssistantVoiceSession(
 ) : VoiceInteractionSession(service) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val owner = SessionViewOwner()
+    private var shown = false
+    private var showGeneration = 0L
 
     override fun onCreateContentView(): View = ComposeView(service).apply {
         setViewTreeLifecycleOwner(owner)
@@ -94,9 +96,13 @@ private class AssistantVoiceSession(
     override fun onShow(args: Bundle?, showFlags: Int) {
         super.onShow(args, showFlags)
         if (!isTrustedAssistantInvocation(showFlags)) {
+            invalidateSurface()
             hide()
             return
         }
+        shown = true
+        val generation = ++showGeneration
+        controller.toolSurface.bind(this) { shown && window?.window?.decorView?.isShown == true }
         window?.window?.apply {
             setGravity(Gravity.BOTTOM)
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
@@ -105,13 +111,27 @@ private class AssistantVoiceSession(
             addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
         // onShow runs before the system makes the voice window visible.
-        scope.launch(Dispatchers.Main) { controller.show() }
+        scope.launch(Dispatchers.Main) {
+            if (shown && showGeneration == generation) controller.show()
+        }
+    }
+
+    override fun onHide() {
+        invalidateSurface()
+        super.onHide()
     }
 
     override fun onDestroy() {
+        invalidateSurface()
         scope.cancel()
         owner.lifecycle.currentState = Lifecycle.State.DESTROYED
         super.onDestroy()
+    }
+
+    private fun invalidateSurface() {
+        shown = false
+        showGeneration++
+        controller.toolSurface.unbind(this)
     }
 
     private fun openChat() {

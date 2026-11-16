@@ -59,6 +59,7 @@ class AssistantVoiceController(
     private val clients: MatrixClientProvider,
     private val controllers: ElementCallControllers,
     private val currentCall: CurrentCallService,
+    internal val toolSurface: AssistantToolSurface,
 ) {
     private val resolver = AssistantChatResolver(preferences, sessions, lockScreen)
     private val mutableState = MutableStateFlow(AssistantVoiceState())
