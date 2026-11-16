@@ -22,6 +22,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.job
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -91,5 +92,23 @@ class RustEncryptedDeviceChannelTest {
         lifetime.cancel()
         assertThat(channel.send(types.single(), "{}").isFailure).isTrue()
         coVerify(exactly = 0) { sdk.sendEncryptedToDeviceMessage(any(), any(), any()) }
+    }
+
+    @Test
+    fun `receive overflow fails the channel and releases its SDK subscription`() = runTest {
+        val sdk = mockk<Client>()
+        val task = mockk<TaskHandle>(relaxed = true)
+        val subscribed = CompletableDeferred<ToDeviceMessageListener>()
+        coEvery { sdk.subscribeToCustomToDeviceMessages(any(), any()) } answers {
+            subscribed.complete(secondArg())
+            task
+        }
+        val channel = RustEncryptedDeviceChannel(sdk, backgroundScope, testCoroutineDispatchers(), peer, types)
+        val collection = async { runCatching { channel.messages.toList() } }
+        val listener = subscribed.await()
+        repeat(256) { listener.onMessage(message) }
+        assertThat(collection.await().exceptionOrNull()).isInstanceOf(IllegalStateException::class.java)
+        coVerify(exactly = 1) { task.cancel() }
+        coVerify(exactly = 1) { task.destroy() }
     }
 }

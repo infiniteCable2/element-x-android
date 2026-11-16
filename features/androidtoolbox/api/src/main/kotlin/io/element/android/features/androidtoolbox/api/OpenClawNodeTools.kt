@@ -60,7 +60,9 @@ class OpenClawNodeTools(private val nodeId: String, private val session: Android
             val key = if ("idempotencyKey" in request) request.text("idempotencyKey") else id
             val timeout = (request["timeoutMs"] as? JsonPrimitive)?.takeUnless { it.isString }?.longOrNull
             val params = try {
-                if ("paramsJSON" !in request) JsonObject(emptyMap()) else {
+                if ("paramsJSON" !in request) {
+                    JsonObject(emptyMap())
+                } else {
                     request.text("paramsJSON")?.takeIf { it.length <= MAX_PARAMS }?.let(Json::parseToJsonElement) as? JsonObject
                 }
             } catch (_: SerializationException) {
@@ -73,7 +75,9 @@ class OpenClawNodeTools(private val nodeId: String, private val session: Android
             // Reserve before dispatch: a cancelled handoff must not become an automatic retry.
             requests[id] = request to result(id, failure("UNAVAILABLE", "The operation was interrupted; its outcome is unknown."))
             try {
-                val execution = if (timeout == null) session.execute(checkNotNull(key), checkNotNull(command), checkNotNull(params)) else {
+                val execution = if (timeout == null) {
+                    session.execute(checkNotNull(key), checkNotNull(command), checkNotNull(params))
+                } else {
                     val remaining = (timeout - received.elapsedNow().inWholeMilliseconds).coerceAtLeast(0)
                     withTimeoutOrNull(remaining) { session.execute(checkNotNull(key), checkNotNull(command), checkNotNull(params)) }
                 }

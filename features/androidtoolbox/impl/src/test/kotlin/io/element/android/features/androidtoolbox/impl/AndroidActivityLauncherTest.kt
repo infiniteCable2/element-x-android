@@ -12,6 +12,7 @@ import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
+import android.os.PowerManager
 import com.google.common.truth.Truth.assertThat
 import io.element.android.features.androidtoolbox.api.AndroidAppLaunch
 import io.element.android.features.androidtoolbox.api.AndroidToolResult
@@ -30,8 +31,10 @@ class AndroidActivityLauncherTest : RobolectricTest() {
         every { isKeyguardLocked } returns false
     }
     private val manager = mockk<PackageManager>()
+    private val power = mockk<PowerManager> { every { isInteractive } returns true }
     private val context = mockk<Context> {
         every { getSystemService(KeyguardManager::class.java) } returns keyguard
+        every { getSystemService(PowerManager::class.java) } returns power
         every { packageManager } returns manager
         every { startActivity(any()) } just runs
     }
@@ -67,6 +70,9 @@ class AndroidActivityLauncherTest : RobolectricTest() {
         assertThat(launcher.submit(action)).isInstanceOf(AndroidToolResult.Failure::class.java)
         every { keyguard.isDeviceLocked } returns false
         every { keyguard.isKeyguardLocked } returns true
+        assertThat(launcher.submit(action)).isInstanceOf(AndroidToolResult.Failure::class.java)
+        every { keyguard.isKeyguardLocked } returns false
+        every { power.isInteractive } returns false
         assertThat(launcher.submit(action)).isInstanceOf(AndroidToolResult.Failure::class.java)
         verify(exactly = 0) { context.startActivity(any()) }
     }

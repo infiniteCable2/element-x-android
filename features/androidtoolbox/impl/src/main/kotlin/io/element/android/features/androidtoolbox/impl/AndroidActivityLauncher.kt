@@ -12,6 +12,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.PowerManager
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.features.androidtoolbox.api.AndroidAppLaunch
@@ -30,7 +31,8 @@ class DefaultAndroidToolLauncherFactory(@ApplicationContext private val context:
 internal class AndroidActivityLauncher(private val context: Context, private val isVisible: () -> Boolean) : AndroidToolLauncher {
     override fun isInteractive(): Boolean {
         val keyguard = context.getSystemService(KeyguardManager::class.java) ?: return false
-        return isVisible() && !keyguard.isDeviceLocked && !keyguard.isKeyguardLocked
+        val power = context.getSystemService(PowerManager::class.java) ?: return false
+        return isVisible() && power.isInteractive && !keyguard.isDeviceLocked && !keyguard.isKeyguardLocked
     }
 
     override fun isAppAvailable(packageName: String): Boolean = try {

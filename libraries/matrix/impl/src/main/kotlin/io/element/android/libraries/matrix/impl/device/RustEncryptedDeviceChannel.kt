@@ -60,6 +60,10 @@ internal class RustEncryptedDeviceChannel(
         val subscription = try {
             client.subscribeToCustomToDeviceMessages(types.toList(), object : ToDeviceMessageListener {
                 override fun onMessage(message: ToDeviceMessage) {
+                    if (!sessionScope.isActive) {
+                        close()
+                        return
+                    }
                     val trusted = message.forPeer(peer, types) ?: return
                     if (trySend(trusted).isFailure) close(IllegalStateException("The encrypted device message queue overflowed."))
                 }
