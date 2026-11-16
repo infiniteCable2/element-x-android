@@ -68,6 +68,7 @@ class OpenClawNodeToolsTest {
             request() + ("paramsJSON" to JsonPrimitive(" ".repeat(16_385))),
             request() + ("timeoutMs" to JsonPrimitive(-1)),
             request() + ("timeoutMs" to JsonPrimitive("1000")),
+            request() + ("sessionKey" to JsonPrimitive(false)),
             request() + ("approved" to JsonPrimitive(true)),
         )
         invalid.forEach { assertThat(node.invoke(JsonObject(it))?.get("ok")).isEqualTo(JsonPrimitive(false)) }
@@ -83,5 +84,6 @@ class OpenClawNodeToolsTest {
         put("command", "maps.search")
         put("paramsJSON", """{"query":"Sample museum"}""")
         put("idempotencyKey", "operation")
+        put("sessionKey", "agent:example:assistant")
     }
 }

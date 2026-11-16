@@ -36,7 +36,7 @@ class AndroidToolSession(
         val operation = Operation(command, params, failure("The operation was interrupted; do not retry it with a new ID."))
         operations[operationId] = operation
         try {
-            toolbox.execute(command, params, launcher, currentGrants()).also { operation.result = it }
+            toolbox.execute(command, params, launcher, currentGrants).also { operation.result = it }
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {

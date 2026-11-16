@@ -79,7 +79,9 @@ class InMemoryAppPreferencesStore(
         assistantChat.update { current ->
             if (current?.hasSameTargetAs(chat) == true) {
                 current.copy(toolCapabilities = if (enabled) current.toolCapabilities + capability else current.toolCapabilities - capability)
-            } else current
+            } else {
+                current
+            }
         }
     }
 

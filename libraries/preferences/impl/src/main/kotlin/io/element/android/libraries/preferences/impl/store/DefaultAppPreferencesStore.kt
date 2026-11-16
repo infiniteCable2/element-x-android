@@ -71,8 +71,10 @@ class DefaultAppPreferencesStore(
         val roomId = prefs[assistantChatRoomKey] ?: return@map null
         runCatching {
             AssistantChat(
-                SessionId(sessionId), RoomId(roomId), prefs[assistantVoiceEnabledKey] == true,
-                prefs[assistantToolCapabilitiesKey].orEmpty(),
+                sessionId = SessionId(sessionId),
+                roomId = RoomId(roomId),
+                voiceEnabled = prefs[assistantVoiceEnabledKey] == true,
+                toolCapabilities = prefs[assistantToolCapabilitiesKey].orEmpty(),
             )
         }.getOrNull()
     }.distinctUntilChanged()

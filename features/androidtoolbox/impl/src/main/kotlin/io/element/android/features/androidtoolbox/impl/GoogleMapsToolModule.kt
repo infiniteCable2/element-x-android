@@ -89,10 +89,12 @@ private fun parameters(field: String, modes: List<String>) = buildJsonObject {
             put("minLength", 1)
             put("maxLength", 2_048)
         })
-        if (modes.isNotEmpty()) put("mode", buildJsonObject {
-            put("type", "string")
-            put("enum", buildJsonArray { modes.forEach { add(JsonPrimitive(it)) } })
-            put("default", "driving")
-        })
+        if (modes.isNotEmpty()) {
+            put("mode", buildJsonObject {
+                put("type", "string")
+                put("enum", buildJsonArray { modes.forEach { add(JsonPrimitive(it)) } })
+                put("default", "driving")
+            })
+        }
     })
 }

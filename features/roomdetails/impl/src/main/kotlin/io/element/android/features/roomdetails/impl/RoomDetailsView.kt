@@ -316,8 +316,11 @@ fun RoomDetailsView(
                     icon = CompoundIcons.Chat(),
                     title = stringResource(R.string.screen_room_details_chat_bubble_title),
                     subtitle = stringResource(
-                        if (state.canUseBubbles) R.string.screen_room_details_chat_bubble_subtitle
-                        else R.string.screen_room_details_chat_bubble_pin_disabled
+                        if (state.canUseBubbles) {
+                            R.string.screen_room_details_chat_bubble_subtitle
+                        } else {
+                            R.string.screen_room_details_chat_bubble_pin_disabled
+                        }
                     ),
                     isChecked = state.isBubbleEnabled && state.canUseBubbles,
                     enabled = state.canUseBubbles,

@@ -45,6 +45,7 @@ class AndroidActivityLauncherTest : RobolectricTest() {
             activityInfo = ActivityInfo().apply {
                 packageName = action.packageName
                 name = "MapsActivity"
+                applicationInfo = ApplicationInfo().apply { packageName = action.packageName }
             }
         }
         val result = launcher.submit(action)
@@ -78,6 +79,7 @@ class AndroidActivityLauncherTest : RobolectricTest() {
             activityInfo = ActivityInfo().apply {
                 packageName = action.packageName
                 name = "MapsActivity"
+                applicationInfo = ApplicationInfo().apply { packageName = action.packageName }
             }
         }
         every { context.startActivity(any()) } throws SecurityException("private details")

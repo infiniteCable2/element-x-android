@@ -6,12 +6,19 @@
 package io.element.android.features.androidtoolbox.impl
 
 import com.google.common.truth.Truth.assertThat
+import io.element.android.features.androidtoolbox.api.AndroidAppLaunch
+import io.element.android.features.androidtoolbox.api.AndroidToolDefinition
+import io.element.android.features.androidtoolbox.api.AndroidToolLauncher
 import io.element.android.features.androidtoolbox.api.AndroidToolResult
 import io.element.android.features.androidtoolbox.api.AndroidToolSession
+import io.element.android.features.androidtoolbox.api.AndroidToolbox
 import io.element.android.features.androidtoolbox.test.RecordingAndroidToolLauncher
 import io.element.android.tests.testutils.testCoroutineDispatchers
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -59,5 +66,27 @@ class AndroidToolSessionTest {
         assertThat(session.execute("overflow", "maps.search", params)).isInstanceOf(AndroidToolResult.Failure::class.java)
         session.execute("0", "maps.search", params)
         assertThat(launcher.submissions).hasSize(128)
+    }
+
+    @Test
+    fun `cancellation after a handoff cannot cause a second submission`() = runTest {
+        val launcher = RecordingAndroidToolLauncher()
+        val handedOff = CompletableDeferred<Unit>()
+        val toolbox = object : AndroidToolbox {
+            override fun catalog(launcher: AndroidToolLauncher, grants: Set<String>): List<AndroidToolDefinition> = emptyList()
+            override suspend fun execute(
+                command: String, params: JsonObject, launcher: AndroidToolLauncher, grants: suspend () -> Set<String>,
+            ): AndroidToolResult {
+                launcher.submit(AndroidAppLaunch("com.google.android.apps.maps", "https://www.google.com/maps/"))
+                handedOff.complete(Unit)
+                awaitCancellation()
+            }
+        }
+        val session = AndroidToolSession(toolbox, launcher) { setOf("maps") }
+        val pending = async { session.execute("operation", "maps.search", params) }
+        handedOff.await()
+        pending.cancelAndJoin()
+        assertThat(session.execute("operation", "maps.search", params)).isInstanceOf(AndroidToolResult.Failure::class.java)
+        assertThat(launcher.submissions).hasSize(1)
     }
 }

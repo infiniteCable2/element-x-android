@@ -22,8 +22,10 @@ class DefaultAndroidToolbox(
     private val dispatchers: CoroutineDispatchers,
 ) : AndroidToolbox {
     private val handlers = buildMap {
-        for (module in modules) for (definition in module.definitions) {
-            check(put(definition.command, module to definition) == null) { "Duplicate Android toolbox command" }
+        for (module in modules) {
+            for (definition in module.definitions) {
+                check(put(definition.command, module to definition) == null) { "Duplicate Android toolbox command" }
+            }
         }
     }
 
@@ -32,11 +34,11 @@ class DefaultAndroidToolbox(
         .map { (_, definition) -> definition }
         .sortedBy { it.command }
 
-    override suspend fun execute(command: String, params: JsonObject, launcher: AndroidToolLauncher, grants: Set<String>): AndroidToolResult =
+    override suspend fun execute(command: String, params: JsonObject, launcher: AndroidToolLauncher, grants: suspend () -> Set<String>): AndroidToolResult =
         withContext(dispatchers.main) {
             val (module, definition) = handlers[command]
                 ?: return@withContext AndroidToolResult.Failure(AndroidToolResult.Reason.UNKNOWN_COMMAND, "Unknown Android command.")
-            if (module.capability !in grants || (definition.requiresForeground && !launcher.isInteractive())) {
+            if (module.capability !in grants() || (definition.requiresForeground && !launcher.isInteractive())) {
                 return@withContext AndroidToolResult.Failure(AndroidToolResult.Reason.NOT_AUTHORIZED, "An enabled, visible and unlocked assistant is required.")
             }
             try {

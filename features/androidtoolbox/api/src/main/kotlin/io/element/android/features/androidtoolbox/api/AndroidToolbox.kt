@@ -10,7 +10,7 @@ import kotlinx.serialization.json.JsonObject
 /** Local Android adapters. The caller owns authenticated device/session binding and invocation IDs. */
 interface AndroidToolbox {
     fun catalog(launcher: AndroidToolLauncher, grants: Set<String>): List<AndroidToolDefinition>
-    suspend fun execute(command: String, params: JsonObject, launcher: AndroidToolLauncher, grants: Set<String>): AndroidToolResult
+    suspend fun execute(command: String, params: JsonObject, launcher: AndroidToolLauncher, grants: suspend () -> Set<String>): AndroidToolResult
 }
 
 data class AndroidToolDefinition(

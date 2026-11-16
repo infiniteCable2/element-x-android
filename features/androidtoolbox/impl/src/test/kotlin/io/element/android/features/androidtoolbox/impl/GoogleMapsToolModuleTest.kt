@@ -38,11 +38,25 @@ class GoogleMapsToolModuleTest {
     fun `directions preview and navigation request differ explicitly`() = runTest {
         module.execute("maps.directions", params("""{"destination":"Sample square","mode":"transit"}"""), launcher)
         assertThat(URI(launcher.submissions.last().uri).parameters()).containsExactly(
-            "api", "1", "destination", "Sample square", "travelmode", "transit",
+            "api",
+            "1",
+            "destination",
+            "Sample square",
+            "travelmode",
+            "transit",
         )
         module.execute("maps.navigate", params("""{"destination":"Sample square","placeId":"place","mode":"walking"}"""), launcher)
         assertThat(URI(launcher.submissions.last().uri).parameters()).containsExactly(
-            "api", "1", "destination", "Sample square", "destination_place_id", "place", "travelmode", "walking", "dir_action", "navigate",
+            "api",
+            "1",
+            "destination",
+            "Sample square",
+            "destination_place_id",
+            "place",
+            "travelmode",
+            "walking",
+            "dir_action",
+            "navigate",
         )
         module.execute("maps.navigate", params("""{"destination":"Sample square"}"""), launcher)
         assertThat(URI(launcher.submissions.last().uri).parameters()["travelmode"]).isEqualTo("driving")

@@ -10,6 +10,8 @@ import io.element.android.features.androidtoolbox.api.AndroidToolCapabilities
 import io.element.android.features.androidtoolbox.api.AndroidToolResult
 import io.element.android.features.androidtoolbox.test.RecordingAndroidToolLauncher
 import io.element.android.tests.testutils.testCoroutineDispatchers
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.async
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -32,22 +34,32 @@ class DefaultAndroidToolboxTest {
     @Test
     fun `every invocation rechecks grants visibility and installation`() = runTest {
         val toolbox = DefaultAndroidToolbox(setOf(GoogleMapsToolModule()), testCoroutineDispatchers())
-        assertThat(toolbox.execute("maps.search", query, launcher, emptySet()).reason()).isEqualTo(AndroidToolResult.Reason.NOT_AUTHORIZED)
+        assertThat(toolbox.execute("maps.search", query, launcher) { emptySet() }.reason()).isEqualTo(AndroidToolResult.Reason.NOT_AUTHORIZED)
         launcher.interactive = false
-        assertThat(toolbox.execute("maps.search", query, launcher, grants).reason()).isEqualTo(AndroidToolResult.Reason.NOT_AUTHORIZED)
+        assertThat(toolbox.execute("maps.search", query, launcher) { grants }.reason()).isEqualTo(AndroidToolResult.Reason.NOT_AUTHORIZED)
         launcher.interactive = true
         launcher.availablePackages.clear()
-        assertThat(toolbox.execute("maps.search", query, launcher, grants).reason()).isEqualTo(AndroidToolResult.Reason.NOT_AVAILABLE)
+        assertThat(toolbox.execute("maps.search", query, launcher) { grants }.reason()).isEqualTo(AndroidToolResult.Reason.NOT_AVAILABLE)
         launcher.availablePackages.add("com.google.android.apps.maps")
-        assertThat(toolbox.execute("unregistered", query, launcher, grants).reason()).isEqualTo(AndroidToolResult.Reason.UNKNOWN_COMMAND)
+        assertThat(toolbox.execute("unregistered", query, launcher) { grants }.reason()).isEqualTo(AndroidToolResult.Reason.UNKNOWN_COMMAND)
         assertThat(launcher.submissions).isEmpty()
-        assertThat(toolbox.execute("maps.search", query, launcher, grants)).isInstanceOf(AndroidToolResult.Success::class.java)
+        assertThat(toolbox.execute("maps.search", query, launcher) { grants }).isInstanceOf(AndroidToolResult.Success::class.java)
         assertThat(launcher.submissions).hasSize(1)
     }
 
     @Test(expected = IllegalStateException::class)
     fun `conflicting modules fail instead of silently changing the handler`() = runTest {
         DefaultAndroidToolbox(setOf(GoogleMapsToolModule(), GoogleMapsToolModule()), testCoroutineDispatchers())
+    }
+
+    @Test
+    fun `revocation while dispatch is queued is checked on the launch dispatcher`() = runTest {
+        var current = grants
+        val toolbox = DefaultAndroidToolbox(setOf(GoogleMapsToolModule()), testCoroutineDispatchers())
+        val pending = async(start = CoroutineStart.UNDISPATCHED) { toolbox.execute("maps.search", query, launcher) { current } }
+        current = emptySet()
+        assertThat(pending.await().reason()).isEqualTo(AndroidToolResult.Reason.NOT_AUTHORIZED)
+        assertThat(launcher.submissions).isEmpty()
     }
 
     private fun AndroidToolResult.reason() = (this as AndroidToolResult.Failure).reason
