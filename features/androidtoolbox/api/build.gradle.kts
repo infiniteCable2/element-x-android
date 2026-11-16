@@ -7,4 +7,5 @@ android { namespace = "io.element.android.features.androidtoolbox.api" }
 
 dependencies {
     api(libs.serialization.json)
+    implementation(libs.coroutines.core)
 }
