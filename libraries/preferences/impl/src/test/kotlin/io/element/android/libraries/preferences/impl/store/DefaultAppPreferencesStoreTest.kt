@@ -191,4 +191,26 @@ class DefaultAppPreferencesStoreTest : RobolectricTest() {
         buildMeta = buildMeta,
         preferenceDataStoreFactory = FakePreferenceDataStoreFactory(),
     )
+
+    @Test
+    fun `tool grants are opt in scoped to the target and independently revocable`() = runTest {
+        val store = createStore()
+        val first = AssistantChat(SessionId("@example:example.org"), RoomId("!first:example.org"))
+        val second = first.copy(roomId = RoomId("!second:example.org"))
+        store.setAssistantChatEnabled(first, true)
+        assertThat(store.getAssistantChatFlow().first()?.toolCapabilities).isEmpty()
+        store.setAssistantToolEnabled(first, "maps", true)
+        store.setAssistantToolEnabled(first, "future", true)
+        store.setAssistantChatEnabled(first, true)
+        assertThat(store.getAssistantChatFlow().first()?.toolCapabilities).containsExactly("maps", "future")
+        store.setAssistantToolEnabled(first, "maps", false)
+        assertThat(store.getAssistantChatFlow().first()?.toolCapabilities).containsExactly("future")
+        store.setAssistantChatEnabled(second, true)
+        store.setAssistantToolEnabled(first, "maps", true)
+        assertThat(store.getAssistantChatFlow().first()?.toolCapabilities).isEmpty()
+        store.setAssistantToolEnabled(second, "maps", true)
+        store.setAssistantChatEnabled(second, false)
+        store.setAssistantChatEnabled(second, true)
+        assertThat(store.getAssistantChatFlow().first()?.toolCapabilities).isEmpty()
+    }
 }

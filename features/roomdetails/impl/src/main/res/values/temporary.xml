@@ -9,4 +9,6 @@
     <string name="screen_room_details_assistant_chat_settings">Choose Element as the default assistant</string>
     <string name="screen_room_details_assistant_voice_title">Start a voice call directly</string>
     <string name="screen_room_details_assistant_voice_subtitle">Calling the Android assistant starts an audio call in this chat.</string>
+    <string name="screen_room_details_assistant_maps_title">Android Toolbox: Google Maps</string>
+    <string name="screen_room_details_assistant_maps_subtitle">Allow this assistant to open searches, routes and navigation in Google Maps while the assistant is visible and the phone is unlocked.</string>
 </resources>

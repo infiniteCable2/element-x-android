@@ -26,6 +26,7 @@ android {
 setupDependencyInjection()
 
 dependencies {
+    implementation(projects.features.androidtoolbox.api)
     implementation(projects.appconfig)
     implementation(projects.libraries.core)
     implementation(projects.libraries.architecture)

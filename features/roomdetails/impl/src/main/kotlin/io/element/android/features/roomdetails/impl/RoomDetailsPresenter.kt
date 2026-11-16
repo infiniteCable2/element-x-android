@@ -53,6 +53,7 @@ import io.element.android.libraries.matrix.ui.room.getDirectRoomMember
 import io.element.android.libraries.matrix.ui.room.roomMemberIdentityStateChange
 import io.element.android.libraries.preferences.api.store.AppPreferencesStore
 import io.element.android.libraries.preferences.api.store.AssistantChat
+import io.element.android.features.androidtoolbox.api.AndroidToolCapabilities
 import io.element.android.libraries.preferences.api.store.SessionPreferencesStore
 import io.element.android.libraries.push.api.notifications.NotificationCleaner
 import io.element.android.libraries.push.api.notifications.bubbles.BubbleRoom
@@ -186,6 +187,9 @@ class RoomDetailsPresenter(
                 is RoomDetailsEvent.SetAssistantVoiceEnabled -> scope.launch {
                     appPreferencesStore.setAssistantVoiceEnabled(currentAssistantChat, event.enabled)
                 }
+                is RoomDetailsEvent.SetAssistantMapsEnabled -> scope.launch {
+                    appPreferencesStore.setAssistantToolEnabled(currentAssistantChat, AndroidToolCapabilities.MAPS, event.enabled)
+                }
                 is RoomDetailsEvent.SetBubbleEnabled -> scope.launch {
                     if (event.enabled && canUseBubbles) {
                         val shortcutCreated = notificationConversationService.onSendMessage(
@@ -249,6 +253,7 @@ class RoomDetailsPresenter(
             isAssistantChatEnabled = isAssistantChatEnabled,
             canUseAssistantVoice = roomInfo.isDirect && roomInfo.joinedMembersCount == 2L,
             isAssistantVoiceEnabled = isAssistantChatEnabled && selectedAssistantChat?.voiceEnabled == true,
+            isAssistantMapsEnabled = isAssistantChatEnabled && AndroidToolCapabilities.MAPS in selectedAssistantChat?.toolCapabilities.orEmpty(),
             displayRolesAndPermissionsSettings = !isDm && permissions.canEditRolesAndPermissions,
             isPublic = joinRule == JoinRule.Public,
             heroes = roomInfo.heroes,

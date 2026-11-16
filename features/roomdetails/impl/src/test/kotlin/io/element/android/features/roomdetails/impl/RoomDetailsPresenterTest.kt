@@ -152,6 +152,25 @@ class RoomDetailsPresenterTest {
     }
 
     @Test
+    fun `present - Maps access is controlled by the assistant target`() = runTest {
+        val room = aJoinedRoom()
+        val preferences = InMemoryAppPreferencesStore()
+        preferences.setAssistantChatEnabled(AssistantChat(A_SESSION_ID, room.roomId), true)
+        val presenter = createRoomDetailsPresenter(room, appPreferencesStore = preferences)
+        presenter.testWithLifecycleOwner(lifecycleOwner = fakeLifecycleOwner) {
+            val selected = consumeItemsUntilPredicate { it.isAssistantChatEnabled }.last()
+            assertThat(selected.isAssistantMapsEnabled).isFalse()
+            selected.eventSink(RoomDetailsEvent.SetAssistantMapsEnabled(true))
+            val granted = consumeItemsUntilPredicate { it.isAssistantMapsEnabled }.last()
+            assertThat(preferences.getAssistantChatFlow().first()?.toolCapabilities).containsExactly("maps")
+            granted.eventSink(RoomDetailsEvent.SetAssistantMapsEnabled(false))
+            consumeItemsUntilPredicate { !it.isAssistantMapsEnabled }
+            assertThat(preferences.getAssistantChatFlow().first()?.toolCapabilities).isEmpty()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
     fun `present - copy room id on old device shows a toast`() = runTest {
         val room = aJoinedRoom(
             roomPermissions = roomPermissions(),

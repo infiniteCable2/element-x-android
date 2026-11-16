@@ -62,7 +62,7 @@ class InMemoryAppPreferencesStore(
         assistantChat.update { current ->
             val sameTarget = current?.hasSameTargetAs(chat) == true
             when {
-                enabled && !sameTarget -> chat.copy(voiceEnabled = false)
+                enabled && !sameTarget -> chat.copy(voiceEnabled = false, toolCapabilities = emptySet())
                 !enabled && sameTarget -> null
                 else -> current
             }
@@ -72,6 +72,14 @@ class InMemoryAppPreferencesStore(
     override suspend fun setAssistantVoiceEnabled(chat: AssistantChat, enabled: Boolean) {
         assistantChat.update { current ->
             if (current?.hasSameTargetAs(chat) == true) current.copy(voiceEnabled = enabled) else current
+        }
+    }
+
+    override suspend fun setAssistantToolEnabled(chat: AssistantChat, capability: String, enabled: Boolean) {
+        assistantChat.update { current ->
+            if (current?.hasSameTargetAs(chat) == true) {
+                current.copy(toolCapabilities = if (enabled) current.toolCapabilities + capability else current.toolCapabilities - capability)
+            } else current
         }
     }
 

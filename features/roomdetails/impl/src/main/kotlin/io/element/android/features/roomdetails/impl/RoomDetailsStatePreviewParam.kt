@@ -63,6 +63,7 @@ open class RoomDetailsStatePreviewParam : PreviewParameterProvider<RoomDetailsSt
             aSharedHistoryRoomDetailsState(roomHistoryVisibility = RoomHistoryVisibility.WorldReadable),
             aRoomDetailsState(isAssistantChatEnabled = true),
             aRoomDetailsState(isAssistantChatEnabled = true, canUseAssistantVoice = true, isAssistantVoiceEnabled = true),
+            aRoomDetailsState(isAssistantChatEnabled = true, canUseAssistantVoice = true, isAssistantVoiceEnabled = true, isAssistantMapsEnabled = true),
             // Add other state here
         )
 }
@@ -134,6 +135,7 @@ fun aRoomDetailsState(
     isAssistantChatEnabled: Boolean = false,
     canUseAssistantVoice: Boolean = false,
     isAssistantVoiceEnabled: Boolean = false,
+    isAssistantMapsEnabled: Boolean = false,
     eventSink: (RoomDetailsEvent) -> Unit = {},
 ) = RoomDetailsState(
     roomId = roomId,
@@ -156,6 +158,7 @@ fun aRoomDetailsState(
     isAssistantChatEnabled = isAssistantChatEnabled,
     canUseAssistantVoice = canUseAssistantVoice,
     isAssistantVoiceEnabled = isAssistantVoiceEnabled,
+    isAssistantMapsEnabled = isAssistantMapsEnabled,
     displayRolesAndPermissionsSettings = displayAdminSettings,
     isPublic = isPublic,
     heroes = heroes.toImmutableList(),

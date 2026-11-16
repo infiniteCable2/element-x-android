@@ -9,4 +9,6 @@
     <string name="screen_room_details_assistant_chat_settings">Element als Standardassistent auswählen</string>
     <string name="screen_room_details_assistant_voice_title">Sprachgespräch direkt starten</string>
     <string name="screen_room_details_assistant_voice_subtitle">Beim Aufruf des Android-Assistenten startet ein Audioanruf in diesem Chat.</string>
+    <string name="screen_room_details_assistant_maps_title">Android Toolbox: Google Maps</string>
+    <string name="screen_room_details_assistant_maps_subtitle">Dieser Assistent darf Suchen, Routen und Navigation in Google Maps öffnen, solange der Assistent sichtbar und das Telefon entsperrt ist.</string>
 </resources>

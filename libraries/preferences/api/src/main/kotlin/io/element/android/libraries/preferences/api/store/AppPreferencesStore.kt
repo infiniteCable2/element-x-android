@@ -29,6 +29,9 @@ interface AppPreferencesStore {
     /** Change the direct voice invocation only for the chat that is still selected. */
     suspend fun setAssistantVoiceEnabled(chat: AssistantChat, enabled: Boolean)
 
+    /** Grant one Android tool capability to the selected chat. New capabilities are disabled by default. */
+    suspend fun setAssistantToolEnabled(chat: AssistantChat, capability: String, enabled: Boolean)
+
     /**
      * @param enabled true to expose the developer options in the settings.
      */

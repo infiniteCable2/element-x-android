@@ -18,6 +18,7 @@ sealed interface RoomDetailsEvent {
     data class SetBubbleEnabled(val enabled: Boolean) : RoomDetailsEvent
     data class SetAssistantChatEnabled(val enabled: Boolean) : RoomDetailsEvent
     data class SetAssistantVoiceEnabled(val enabled: Boolean) : RoomDetailsEvent
+    data class SetAssistantMapsEnabled(val enabled: Boolean) : RoomDetailsEvent
     data object MarkAsRead : RoomDetailsEvent
     data object MarkAsUnread : RoomDetailsEvent
 }

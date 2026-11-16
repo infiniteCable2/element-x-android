@@ -13,6 +13,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.core.stringSetPreferencesKey
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
 import io.element.android.libraries.core.meta.BuildMeta
@@ -41,6 +42,7 @@ private val otherAccountsExpandedKey = booleanPreferencesKey("otherAccountsExpan
 private val assistantChatSessionKey = stringPreferencesKey("assistantChatSession")
 private val assistantChatRoomKey = stringPreferencesKey("assistantChatRoom")
 private val assistantVoiceEnabledKey = booleanPreferencesKey("assistantVoiceEnabled")
+private val assistantToolCapabilitiesKey = stringSetPreferencesKey("assistantToolCapabilities")
 private val timelineMediaPreviewValueKey = stringPreferencesKey("timelineMediaPreviewValue")
 private val liveLocationMinimumDistanceUpdateKey = intPreferencesKey("liveLocationMinimumDistanceUpdate")
 private val logLevelKey = stringPreferencesKey("logLevel")
@@ -67,20 +69,29 @@ class DefaultAppPreferencesStore(
     override fun getAssistantChatFlow(): Flow<AssistantChat?> = store.data.map { prefs ->
         val sessionId = prefs[assistantChatSessionKey] ?: return@map null
         val roomId = prefs[assistantChatRoomKey] ?: return@map null
-        runCatching { AssistantChat(SessionId(sessionId), RoomId(roomId), prefs[assistantVoiceEnabledKey] == true) }.getOrNull()
+        runCatching {
+            AssistantChat(
+                SessionId(sessionId), RoomId(roomId), prefs[assistantVoiceEnabledKey] == true,
+                prefs[assistantToolCapabilitiesKey].orEmpty(),
+            )
+        }.getOrNull()
     }.distinctUntilChanged()
 
     override suspend fun setAssistantChatEnabled(chat: AssistantChat, enabled: Boolean) {
         store.edit { prefs ->
             val sameTarget = prefs.matchesAssistantChat(chat)
             if (enabled) {
-                if (!sameTarget) prefs.remove(assistantVoiceEnabledKey)
+                if (!sameTarget) {
+                    prefs.remove(assistantVoiceEnabledKey)
+                    prefs.remove(assistantToolCapabilitiesKey)
+                }
                 prefs[assistantChatSessionKey] = chat.sessionId.value
                 prefs[assistantChatRoomKey] = chat.roomId.value
             } else if (sameTarget) {
                 prefs.remove(assistantChatSessionKey)
                 prefs.remove(assistantChatRoomKey)
                 prefs.remove(assistantVoiceEnabledKey)
+                prefs.remove(assistantToolCapabilitiesKey)
             }
         }
     }
@@ -88,6 +99,15 @@ class DefaultAppPreferencesStore(
     override suspend fun setAssistantVoiceEnabled(chat: AssistantChat, enabled: Boolean) {
         store.edit { prefs ->
             if (prefs.matchesAssistantChat(chat)) prefs[assistantVoiceEnabledKey] = enabled
+        }
+    }
+
+    override suspend fun setAssistantToolEnabled(chat: AssistantChat, capability: String, enabled: Boolean) {
+        store.edit { prefs ->
+            if (prefs.matchesAssistantChat(chat)) {
+                val current = prefs[assistantToolCapabilitiesKey].orEmpty()
+                prefs[assistantToolCapabilitiesKey] = if (enabled) current + capability else current - capability
+            }
         }
     }
 

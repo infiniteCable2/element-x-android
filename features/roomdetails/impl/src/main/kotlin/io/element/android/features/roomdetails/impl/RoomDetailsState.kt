@@ -43,6 +43,7 @@ data class RoomDetailsState(
     val isAssistantChatEnabled: Boolean,
     val canUseAssistantVoice: Boolean,
     val isAssistantVoiceEnabled: Boolean,
+    val isAssistantMapsEnabled: Boolean,
     val displayRolesAndPermissionsSettings: Boolean,
     val isPublic: Boolean,
     val heroes: ImmutableList<MatrixUser>,
