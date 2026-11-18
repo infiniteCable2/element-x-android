@@ -8,8 +8,8 @@ package io.element.android.libraries.matrix.impl.device
 import com.google.common.truth.Truth.assertThat
 import io.element.android.libraries.matrix.api.core.DeviceId
 import io.element.android.libraries.matrix.api.core.UserId
-import io.element.android.libraries.matrix.api.device.MatrixDevicePeer
 import io.element.android.libraries.matrix.api.device.EncryptedDeviceMessage
+import io.element.android.libraries.matrix.api.device.MatrixDevicePeer
 import io.element.android.libraries.matrix.impl.rtc.A_SENDER_DEVICE
 import io.element.android.libraries.matrix.impl.rtc.anEncryptionInfo
 import io.element.android.tests.testutils.testCoroutineDispatchers
