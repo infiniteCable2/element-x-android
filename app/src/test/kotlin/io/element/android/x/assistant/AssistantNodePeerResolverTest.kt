@@ -70,12 +70,22 @@ class AssistantNodePeerResolverTest {
             }
         }
         coEvery { room.getDirectRoomMember() } answers {
-            mockk<RoomMember> {
-                every { userId } returns memberId
-                every { membership } returns this@AssistantNodePeerResolverTest.membership
-            }
+            RoomMember(
+                userId = memberId,
+                displayName = null,
+                avatarUrl = null,
+                membership = membership,
+                isNameAmbiguous = false,
+                powerLevel = 0,
+                isIgnored = false,
+                role = RoomMember.Role.User,
+                membershipChangeReason = null,
+                isServiceMember = false,
+                displayedStatus = null,
+            )
         }
-        coEvery { encryption.getUserIdentity(any(), any()) } answers {
+        // MockK's generic any<UserId>() constructs a random invalid value-class ID while recording the signature.
+        coEvery { encryption.getUserIdentity(peerId, fallbackToServer = true) } answers {
             afterIdentity()
             Result.success(verified)
         }
