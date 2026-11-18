@@ -347,8 +347,10 @@ class AssistantNodeCoordinatorTest {
                             result.complete(native["params"]!!.jsonObject)
                             ack(native, JsonObject(emptyMap()))
                         }
+                        else -> Unit
                     }
                 }
+                else -> Unit
             }
             return Result.success(Unit)
         }

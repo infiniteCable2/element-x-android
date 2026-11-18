@@ -69,6 +69,21 @@ class OpenClawNodeConnectionTest {
     }
 
     @Test
+    fun `ready native connection rejects an invocation without a confirmed finite live deadline`() = runTest {
+        for (deadline in listOf(null, OpenClawInvokeDeadline(1) { 1 })) {
+            val fixture = Fixture(this)
+            val node = fixture.node(setup = true)
+            node.receive(challenge())
+            node.receive(fixture.response(hello()))
+            node.receive(fixture.response(json("{}")))
+            assertThat(node.phase.value).isEqualTo(OpenClawNodeConnection.Phase.Ready)
+            val invocation = json("""{"type":"event","event":"node.invoke.request","payload":{"id":"sample-invoke"}}""")
+            assertThat(runCatching { node.receive(invocation, deadline) }.isFailure).isTrue()
+            assertThat(fixture.launcher.submissions).isEmpty()
+        }
+    }
+
+    @Test
     fun `reconnect uses deviceToken only and signs the exact same token`() = runTest {
         val fixture = Fixture(this)
         fixture.store.entry = OpenClawDeviceAuthEntry("saved-device-token", "node", emptyList(), 1)
