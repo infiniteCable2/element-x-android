@@ -11,4 +11,14 @@
     <string name="screen_room_details_assistant_voice_subtitle">Beim Aufruf des Android-Assistenten startet ein Audioanruf in diesem Chat.</string>
     <string name="screen_room_details_assistant_maps_title">Android Toolbox: Google Maps</string>
     <string name="screen_room_details_assistant_maps_subtitle">Dieser Assistent darf Suchen, Routen und Navigation in Google Maps öffnen, solange der Assistent sichtbar und das Telefon entsperrt ist.</string>
+    <string name="screen_room_details_node_title">Android Toolbox koppeln</string>
+    <string name="screen_room_details_node_description">Trage die Gerätekennung und den einmaligen Einrichtungscode von deinem Assistenten-Administrator ein. Dafür ist ein persönlich verifizierter, verschlüsselter Einzelchat nötig. Den App-Zugriff erlaubst du separat darunter.</string>
+    <string name="screen_room_details_node_device">Gerätekennung des Assistenten</string>
+    <string name="screen_room_details_node_code">Einmaliger Einrichtungscode</string>
+    <string name="screen_room_details_node_pair">Gerät koppeln</string>
+    <string name="screen_room_details_node_working">Die sichere Verbindung wird hergestellt. Bestätige das Gerät auf deinem Assistenten-Server, falls dort eine Freigabe angefragt wird.</string>
+    <string name="screen_room_details_node_paired">Gerät gekoppelt. Freigegebene Werkzeuge sind im bereiten Assistentengespräch verfügbar, solange der Assistent sichtbar und das Telefon entsperrt ist.</string>
+    <string name="screen_room_details_node_invalid">Bitte einen gültigen einmaligen Geräte-Einrichtungscode verwenden. Gemeinsame Zugriffsschlüssel und Passwörter werden nicht akzeptiert.</string>
+    <string name="screen_room_details_node_unverified">Wähle einen verschlüsselten Einzelchat mit einem persönlich verifizierten Assistenten, aktiviere Sprachgespräche und prüfe die Gerätekennung.</string>
+    <string name="screen_room_details_node_failed">Die Kopplung konnte nicht abgeschlossen werden. Prüfe das Assistentengerät, die Serverfreigabe und den Einrichtungscode und versuche es erneut.</string>
 </resources>

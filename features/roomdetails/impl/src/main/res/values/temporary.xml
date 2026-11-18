@@ -11,4 +11,14 @@
     <string name="screen_room_details_assistant_voice_subtitle">Calling the Android assistant starts an audio call in this chat.</string>
     <string name="screen_room_details_assistant_maps_title">Android Toolbox: Google Maps</string>
     <string name="screen_room_details_assistant_maps_subtitle">Allow this assistant to open searches, routes and navigation in Google Maps while the assistant is visible and the phone is unlocked.</string>
+    <string name="screen_room_details_node_title">Pair Android Toolbox</string>
+    <string name="screen_room_details_node_description">Use the device ID and one-time setup code provided by your assistant administrator. This must be a verified, encrypted direct chat. App access is enabled separately below.</string>
+    <string name="screen_room_details_node_device">Assistant device ID</string>
+    <string name="screen_room_details_node_code">One-time setup code</string>
+    <string name="screen_room_details_node_pair">Pair device</string>
+    <string name="screen_room_details_node_working">Connecting securely. Approve this device on your assistant server if requested.</string>
+    <string name="screen_room_details_node_paired">Device paired. Enabled tools are available during a ready assistant call while the assistant is visible and the phone is unlocked.</string>
+    <string name="screen_room_details_node_invalid">Use a valid one-time device setup code. Shared access tokens and passwords are not accepted.</string>
+    <string name="screen_room_details_node_unverified">Select an encrypted direct chat with one personally verified assistant, enable voice calls and check the device ID.</string>
+    <string name="screen_room_details_node_failed">Pairing could not be completed. Check the assistant device, server approval and setup code, then try again.</string>
 </resources>

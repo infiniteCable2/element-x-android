@@ -128,6 +128,10 @@ fun RoomDetailsView(
     modifier: Modifier = Modifier,
     leaveRoomView: @Composable () -> Unit,
 ) {
+    var showNodePairing by remember(state.roomId, state.isAssistantChatEnabled) { mutableStateOf(false) }
+    if (showNodePairing && state.isAssistantChatEnabled && state.isAssistantVoiceEnabled) {
+        AssistantNodePairingDialog(state.assistantNodePairing, state.eventSink, onDismiss = { showNodePairing = false })
+    }
     val snackbarHostState = rememberSnackbarHostState(snackbarMessage = state.snackbarMessage)
     Scaffold(
         modifier = modifier,
@@ -363,6 +367,10 @@ fun RoomDetailsView(
                                 onCheckedChange = { state.eventSink(RoomDetailsEvent.SetAssistantVoiceEnabled(it)) },
                             )
                             if (state.isAssistantVoiceEnabled) {
+                                ListItem(
+                                    content = { Text(stringResource(R.string.screen_room_details_node_title)) },
+                                    onClick = { showNodePairing = true },
+                                )
                                 PreferenceSwitch(
                                     title = stringResource(R.string.screen_room_details_assistant_maps_title),
                                     subtitle = stringResource(R.string.screen_room_details_assistant_maps_subtitle),

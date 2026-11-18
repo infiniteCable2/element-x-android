@@ -14,14 +14,17 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import dev.zacsweers.metro.Assisted
 import dev.zacsweers.metro.AssistedFactory
 import dev.zacsweers.metro.AssistedInject
 import im.vector.app.features.analytics.plan.Interaction
 import io.element.android.features.androidtoolbox.api.AndroidToolCapabilities
+import io.element.android.features.androidtoolbox.api.AssistantNodePairing
 import io.element.android.features.knockrequests.api.KnockRequestPermissions
 import io.element.android.features.knockrequests.api.knockRequestPermissions
 import io.element.android.features.leaveroom.api.LeaveRoomEvent
@@ -63,6 +66,7 @@ import io.element.android.libraries.ui.strings.CommonStrings
 import io.element.android.services.analytics.api.AnalyticsService
 import io.element.android.services.analyticsproviders.api.trackers.captureInteraction
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
@@ -86,6 +90,7 @@ class RoomDetailsPresenter(
     private val notificationCleaner: NotificationCleaner,
     private val bubbleService: ConversationBubbleService,
     private val notificationConversationService: NotificationConversationService,
+    private val assistantNodePairing: AssistantNodePairing,
 ) : Presenter<RoomDetailsState> {
     @AssistedFactory
     interface Factory {
@@ -97,6 +102,8 @@ class RoomDetailsPresenter(
     @Composable
     override fun present(): RoomDetailsState {
         val scope = rememberCoroutineScope()
+        var nodePairingState by remember { mutableStateOf(AssistantNodePairingState.Idle) }
+        var nodePairingJob by remember { mutableStateOf<Job?>(null) }
         val leaveRoomState = leaveRoomPresenter.present()
         val roomInfo by room.roomInfoFlow.collectAsState()
         val roomAvatar by remember { derivedStateOf { roomInfo.avatarUrl } }
@@ -190,6 +197,24 @@ class RoomDetailsPresenter(
                 is RoomDetailsEvent.SetAssistantMapsEnabled -> scope.launch {
                     appPreferencesStore.setAssistantToolEnabled(currentAssistantChat, AndroidToolCapabilities.MAPS, event.enabled)
                 }
+                is RoomDetailsEvent.PairAssistantNode -> {
+                    if (nodePairingJob?.isActive != true) {
+                        nodePairingState = AssistantNodePairingState.Working
+                        nodePairingJob = scope.launch {
+                            nodePairingState = when (assistantNodePairing.pair(client.sessionId.value, room.roomId.value, event.deviceId, event.setupCode)) {
+                                AssistantNodePairing.Outcome.Paired -> AssistantNodePairingState.Paired
+                                AssistantNodePairing.Outcome.InvalidSetup -> AssistantNodePairingState.InvalidSetup
+                                AssistantNodePairing.Outcome.UnverifiedChat -> AssistantNodePairingState.UnverifiedChat
+                                AssistantNodePairing.Outcome.Failed -> AssistantNodePairingState.Failed
+                            }
+                        }
+                    }
+                }
+                RoomDetailsEvent.CancelAssistantNodePairing -> {
+                    nodePairingJob?.cancel()
+                    nodePairingJob = null
+                    nodePairingState = AssistantNodePairingState.Idle
+                }
                 is RoomDetailsEvent.SetBubbleEnabled -> scope.launch {
                     if (event.enabled && canUseBubbles) {
                         val shortcutCreated = notificationConversationService.onSendMessage(
@@ -254,6 +279,7 @@ class RoomDetailsPresenter(
             canUseAssistantVoice = roomInfo.isDirect && roomInfo.joinedMembersCount == 2L,
             isAssistantVoiceEnabled = isAssistantChatEnabled && selectedAssistantChat?.voiceEnabled == true,
             isAssistantMapsEnabled = isAssistantChatEnabled && AndroidToolCapabilities.MAPS in selectedAssistantChat?.toolCapabilities.orEmpty(),
+            assistantNodePairing = nodePairingState,
             displayRolesAndPermissionsSettings = !isDm && permissions.canEditRolesAndPermissions,
             isPublic = joinRule == JoinRule.Public,
             heroes = roomInfo.heroes,

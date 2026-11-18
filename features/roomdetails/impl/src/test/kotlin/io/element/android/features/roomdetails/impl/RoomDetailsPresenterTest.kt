@@ -11,6 +11,7 @@ package io.element.android.features.roomdetails.impl
 import androidx.lifecycle.Lifecycle
 import com.google.common.truth.Truth.assertThat
 import im.vector.app.features.analytics.plan.Interaction
+import io.element.android.features.androidtoolbox.api.AssistantNodePairing
 import io.element.android.features.leaveroom.api.LeaveRoomEvent
 import io.element.android.features.leaveroom.api.LeaveRoomState
 import io.element.android.features.roomcall.api.aStandByCallState
@@ -66,6 +67,8 @@ import io.element.android.tests.testutils.testCoroutineDispatchers
 import io.element.android.tests.testutils.testWithLifecycleOwner
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
@@ -95,6 +98,9 @@ class RoomDetailsPresenterTest {
         navigator: RoomDetailsNavigator = FakeRoomDetailsNavigator(),
         notificationCleaner: NotificationCleaner = FakeNotificationCleaner(),
         sessionPreferencesStore: SessionPreferencesStore = InMemorySessionPreferencesStore(),
+        assistantNodePairing: AssistantNodePairing = object : AssistantNodePairing {
+            override suspend fun pair(sessionId: String, roomId: String, peerDeviceId: String, setupCode: String) = AssistantNodePairing.Outcome.Failed
+        },
     ): RoomDetailsPresenter {
         val matrixClient = FakeMatrixClient(notificationSettingsService = notificationSettingsService)
         val roomMemberDetailsPresenterFactory = object : RoomMemberDetailsPresenter.Factory {
@@ -127,7 +133,56 @@ class RoomDetailsPresenterTest {
             sessionPreferencesStore = sessionPreferencesStore,
             bubbleService = io.element.android.libraries.push.test.notifications.bubbles.FakeConversationBubbleService(),
             notificationConversationService = io.element.android.libraries.push.test.notifications.conversations.FakeNotificationConversationService(),
+            assistantNodePairing = assistantNodePairing,
         )
+    }
+
+    @Test
+    fun `present - pairing reports native outcome without changing tool grants or retaining setup text in state`() = runTest {
+        val room = aJoinedRoom()
+        val preferences = InMemoryAppPreferencesStore()
+        val completed = CompletableDeferred<AssistantNodePairing.Outcome>()
+        val pairing = object : AssistantNodePairing {
+            override suspend fun pair(sessionId: String, roomId: String, peerDeviceId: String, setupCode: String): AssistantNodePairing.Outcome {
+                assertThat(sessionId).isEqualTo(A_SESSION_ID.value)
+                assertThat(roomId).isEqualTo(room.roomId.value)
+                assertThat(peerDeviceId).isEqualTo("SAMPLEDEVICE")
+                assertThat(setupCode).isEqualTo("synthetic-setup-code")
+                return completed.await()
+            }
+        }
+        val presenter = createRoomDetailsPresenter(room, appPreferencesStore = preferences, assistantNodePairing = pairing)
+        presenter.testWithLifecycleOwner(lifecycleOwner = fakeLifecycleOwner) {
+            val initial = awaitItem()
+            val event = RoomDetailsEvent.PairAssistantNode("SAMPLEDEVICE", "synthetic-setup-code")
+            assertThat(event.toString()).doesNotContain("synthetic-setup-code")
+            initial.eventSink(event)
+            val working = consumeItemsUntilPredicate { it.assistantNodePairing == AssistantNodePairingState.Working }.last()
+            assertThat(working.toString()).doesNotContain("synthetic-setup-code")
+            completed.complete(AssistantNodePairing.Outcome.Paired)
+            consumeItemsUntilPredicate { it.assistantNodePairing == AssistantNodePairingState.Paired }
+            assertThat(preferences.getAssistantChatFlow().first()).isNull()
+            cancelAndIgnoreRemainingEvents()
+        }
+    }
+
+    @Test
+    fun `present - dismissing pairing cancels the in flight native connection`() = runTest {
+        val cancelled = CompletableDeferred<Unit>()
+        val pairing = object : AssistantNodePairing {
+            override suspend fun pair(sessionId: String, roomId: String, peerDeviceId: String, setupCode: String): AssistantNodePairing.Outcome {
+                try { awaitCancellation() } finally { cancelled.complete(Unit) }
+            }
+        }
+        val presenter = createRoomDetailsPresenter(assistantNodePairing = pairing)
+        presenter.testWithLifecycleOwner(lifecycleOwner = fakeLifecycleOwner) {
+            awaitItem().eventSink(RoomDetailsEvent.PairAssistantNode("SAMPLEDEVICE", "synthetic-setup-code"))
+            val working = consumeItemsUntilPredicate { it.assistantNodePairing == AssistantNodePairingState.Working }.last()
+            working.eventSink(RoomDetailsEvent.CancelAssistantNodePairing)
+            consumeItemsUntilPredicate { it.assistantNodePairing == AssistantNodePairingState.Idle }
+            cancelled.await()
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 
     @Test
