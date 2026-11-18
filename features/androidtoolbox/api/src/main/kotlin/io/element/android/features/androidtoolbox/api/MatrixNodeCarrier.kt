@@ -14,11 +14,17 @@ import kotlinx.serialization.json.put
 import java.util.UUID
 
 /** Ordered, bounded envelope for native Gateway frames. The caller supplies an authenticated device channel. */
-class MatrixNodeCarrier(private val roomId: String, private val linkId: String = UUID.randomUUID().toString()) {
+class MatrixNodeCarrier(
+    private val roomId: String,
+    private val elapsedRealtimeMs: () -> Long,
+    private val linkId: String = UUID.randomUUID().toString(),
+) {
     private var opened = false
     private var closed = false
     private var sent = 0L
     private var received = 0L
+    private var openedAtMs: Long? = null
+    private var serverChallengeAtMs: Long? = null
 
     init {
         require(roomId.isNotBlank() && UUID.fromString(linkId).toString() == linkId)
@@ -27,6 +33,7 @@ class MatrixNodeCarrier(private val roomId: String, private val linkId: String =
     @Synchronized
     fun open(): String {
         check(!opened && !closed)
+        openedAtMs = elapsedRealtimeMs().also { require(it >= 0) }
         opened = true
         return encode("open")
     }
@@ -65,18 +72,42 @@ class MatrixNodeCarrier(private val roomId: String, private val linkId: String =
             "frame" -> {
                 val seq = (envelope["seq"] as? JsonPrimitive)?.takeUnless { it.isString }?.longOrNull
                 val frame = envelope["frame"] as? JsonObject
+                val invoke = frame != null && frame.text("type") == "event" && frame.text("event") == "node.invoke.request"
+                val keys = if (invoke) FRAME_KEYS + "expires_at_ms" else FRAME_KEYS
                 when {
-                    envelope.keys != FRAME_KEYS || seq == null || seq < 0 || frame == null -> fail()
+                    envelope.keys != keys || seq == null || seq < 0 || frame == null -> fail()
                     seq < received -> Incoming.Ignored
                     seq != received || received == Long.MAX_VALUE -> fail()
                     else -> {
+                        if (serverChallengeAtMs == null) {
+                            if (seq != 0L || frame.text("type") != "event" || frame.text("event") != "connect.challenge") return fail()
+                            val timestamp = ((frame["payload"] as? JsonObject)?.get("ts") as? JsonPrimitive)
+                                ?.takeUnless { it.isString }?.longOrNull?.takeIf { it in 0..MAX_SAFE_INTEGER } ?: return fail()
+                            serverChallengeAtMs = timestamp
+                        }
+                        val deadline = if (invoke) {
+                            val expires = (envelope["expires_at_ms"] as? JsonPrimitive)?.takeUnless { it.isString }?.longOrNull
+                                ?.takeIf { it in 1..MAX_SAFE_INTEGER } ?: return fail()
+                            OpenClawInvokeDeadline(expires, ::serverUpperBoundMs).also { if (it.remainingMs() == 0L) return fail() }
+                        } else {
+                            null
+                        }
                         received++
-                        Incoming.Frame(frame)
+                        Incoming.Frame(frame, deadline)
                     }
                 }
             }
             else -> fail()
         }
+    }
+
+    private fun serverUpperBoundMs(): Long {
+        val elapsed = elapsedRealtimeMs() - checkNotNull(openedAtMs)
+        check(elapsed >= 0)
+        val server = checkNotNull(serverChallengeAtMs)
+        check(elapsed <= MAX_SAFE_INTEGER - server)
+        // Counting the entire open/challenge round trip avoids awarding delayed frames extra time.
+        return server + elapsed
     }
 
     private fun fail(): Incoming {
@@ -96,7 +127,7 @@ class MatrixNodeCarrier(private val roomId: String, private val linkId: String =
     }.toString().also { require(it.toByteArray(Charsets.UTF_8).size <= MAX_BYTES) }
 
     sealed interface Incoming {
-        class Frame(val value: JsonObject) : Incoming
+        class Frame(val value: JsonObject, val deadline: OpenClawInvokeDeadline?) : Incoming
         data object Ignored : Incoming
         data object Closed : Incoming
         data object Invalid : Incoming

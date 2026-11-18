@@ -7,10 +7,12 @@ package io.element.android.features.androidtoolbox.impl
 
 import com.google.common.truth.Truth.assertThat
 import io.element.android.features.androidtoolbox.api.AndroidToolSession
+import io.element.android.features.androidtoolbox.api.OpenClawInvokeDeadline
 import io.element.android.features.androidtoolbox.api.OpenClawNodeTools
 import io.element.android.features.androidtoolbox.test.RecordingAndroidToolLauncher
 import io.element.android.tests.testutils.testCoroutineDispatchers
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -74,8 +76,22 @@ class OpenClawNodeToolsTest {
         invalid.forEach { assertThat(node.invoke(JsonObject(it))?.get("ok")).isEqualTo(JsonPrimitive(false)) }
         assertThat(node.invoke(JsonObject(emptyMap()))).isNull()
         val expired = request() + ("timeoutMs" to JsonPrimitive(0))
-        assertThat(node.invoke(JsonObject(expired))?.get("error")?.jsonObject?.get("code")).isEqualTo(JsonPrimitive("TIMEOUT"))
+        assertThat(node.invoke(JsonObject(expired), OpenClawInvokeDeadline(1) { 1 })?.get("error")?.jsonObject?.get("code"))
+            .isEqualTo(JsonPrimitive("TIMEOUT"))
         assertThat(launcher.submissions).isEmpty()
+    }
+
+    @Test
+    fun `native zero timeout remains unbounded under a finite transport ceiling and null params parse normally`() = runTest {
+        val launcher = RecordingAndroidToolLauncher()
+        val session = AndroidToolSession(DefaultAndroidToolbox(setOf(GoogleMapsToolModule()), testCoroutineDispatchers()), launcher) { setOf("maps") }
+        val node = OpenClawNodeTools("sample-node", session)
+        val noNativeTimeout = JsonObject(request() + ("timeoutMs" to JsonPrimitive(0)))
+        assertThat(node.invoke(noNativeTimeout, OpenClawInvokeDeadline(100) { 1 })?.get("ok")).isEqualTo(JsonPrimitive(true))
+        val nullParams = JsonObject(request("null-params") + ("paramsJSON" to JsonNull) + ("idempotencyKey" to JsonPrimitive("null-op")))
+        val error = node.invoke(nullParams)?.get("error")?.jsonObject
+        assertThat(error?.get("code")).isEqualTo(JsonPrimitive("INVALID_PARAMS"))
+        assertThat(launcher.submissions).hasSize(1)
     }
 
     private fun request(id: String = "invocation") = buildJsonObject {

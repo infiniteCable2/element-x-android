@@ -35,6 +35,19 @@ class AssistantToolSurfaceTest {
     }
 
     @Test
+    fun `invocation lease is independent of window visibility and other invocations`() {
+        val surface = AssistantToolSurface(factory)
+        var granted = true
+        val scoped = surface.forInvocation { granted }
+        assertThat(scoped.isInteractive()).isFalse()
+        surface.bind(Any()) { true }
+        assertThat(scoped.isInteractive()).isTrue()
+        granted = false
+        assertThat(scoped.isInteractive()).isFalse()
+        assertThat(surface.launcher.isInteractive()).isTrue()
+    }
+
+    @Test
     fun `destroying an old session cannot revoke the replacement window`() {
         val surface = AssistantToolSurface(factory)
         val oldOwner = Any()

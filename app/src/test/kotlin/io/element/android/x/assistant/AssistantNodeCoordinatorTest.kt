@@ -123,6 +123,42 @@ class AssistantNodeCoordinatorTest {
     }
 
     @Test
+    fun `missing or expired original deadline cannot execute Maps on an authenticated ready link`() = runTest {
+        for (expires in listOf(null, 1234L, Long.MAX_VALUE)) {
+            val fixture = Fixture(this)
+            fixture.bindingSaved = true
+            fixture.deviceToken = "saved-device-token"
+            fixture.gateway.expiresAtMs = expires
+            val running = launch {
+                fixture.coordinator.runAssistant(fixture.binding.sessionId, fixture.binding.roomId) { _, _ -> fixture.current }
+            }
+            fixture.gateway.catalogPublished.await()
+            runCurrent()
+            fixture.gateway.invocation()
+            running.join()
+            assertThat(fixture.actions).isEmpty()
+            assertThat(fixture.gateway.closed).isTrue()
+        }
+    }
+
+    @Test
+    fun `deadline expiring during awaited grant resolution is checked again at actual Maps dispatch`() = runTest {
+        val fixture = Fixture(this)
+        fixture.bindingSaved = true
+        fixture.deviceToken = "saved-device-token"
+        val running = backgroundScope.launch {
+            fixture.coordinator.runAssistant(fixture.binding.sessionId, fixture.binding.roomId) { _, _ -> fixture.current }
+        }
+        fixture.gateway.catalogPublished.await()
+        runCurrent()
+        fixture.selectionReadsBeforeExpiry = 1
+        fixture.gateway.invocation()
+        assertThat(fixture.gateway.result.await()["ok"]).isEqualTo(JsonPrimitive(false))
+        assertThat(fixture.actions).isEmpty()
+        running.cancelAndJoin()
+    }
+
+    @Test
     fun `hidden surface and revoked Maps grant prevent side effects on authenticated link`() = runTest {
         for (hide in listOf(true, false)) {
             val fixture = Fixture(this)
@@ -141,13 +177,15 @@ class AssistantNodeCoordinatorTest {
         }
     }
 
-    private class Fixture(scope: TestScope) {
+    private class Fixture(private val scope: TestScope) {
         val binding = OpenClawNodeBinding("@sample:example.org", "!sample:example.org", "@assistant:example.org", "SAMPLEDEVICE")
         var bindingSaved = false
         var deviceToken: String? = null
         var current = true
         var visible = true
         var mapsEnabled = true
+        var elapsed = 0L
+        var selectionReadsBeforeExpiry: Int? = null
         val actions = mutableListOf<AndroidAppLaunch>()
         val gateway = Gateway()
         private val room = mockk<JoinedRoom>(relaxed = true) {
@@ -158,6 +196,14 @@ class AssistantNodeCoordinatorTest {
         }
         private val peers = mockk<AssistantNodePeerResolver> {
             coEvery { resolve(binding.sessionId, binding.roomId, binding.peerDeviceId) } answers {
+                selectionReadsBeforeExpiry?.let {
+                    if (it == 0) {
+                        elapsed = 60_000
+                        selectionReadsBeforeExpiry = null
+                    } else {
+                        selectionReadsBeforeExpiry = it - 1
+                    }
+                }
                 if (!current) {
                     null
                 } else {
@@ -219,6 +265,7 @@ class AssistantNodeCoordinatorTest {
             store,
             DefaultAndroidToolbox(setOf(GoogleMapsToolModule()), scope.testCoroutineDispatchers()),
             surface,
+            mockk<AssistantNodeClock> { every { elapsedRealtimeMs() } answers { maxOf(scope.testScheduler.currentTime, elapsed) } },
         )
 
         suspend fun pair(): AssistantNodePairing.Outcome {
@@ -236,6 +283,7 @@ class AssistantNodeCoordinatorTest {
         var skipSequence = false
         var answerOpen = true
         var closed = false
+        var expiresAtMs: Long? = 60_000L
         override val isActive: Boolean get() = !closed
         val opened = CompletableDeferred<Unit>()
         val catalogPublished = CompletableDeferred<Unit>()
@@ -325,7 +373,12 @@ class AssistantNodeCoordinatorTest {
 
         private suspend fun frame(value: JsonObject) {
             val base = checkNotNull(envelope)
-            val content = JsonObject(base + mapOf("kind" to JsonPrimitive("frame"), "seq" to JsonPrimitive(seq++), "frame" to value))
+            val expiry = if (value["event"] == JsonPrimitive("node.invoke.request")) {
+                expiresAtMs?.let { mapOf("expires_at_ms" to JsonPrimitive(it)) }.orEmpty()
+            } else {
+                emptyMap()
+            }
+            val content = JsonObject(base + mapOf("kind" to JsonPrimitive("frame"), "seq" to JsonPrimitive(seq++), "frame" to value) + expiry)
             input.send(EncryptedDeviceMessage(MatrixNodeCarrier.EVENT_TYPE, content.toString()))
         }
     }

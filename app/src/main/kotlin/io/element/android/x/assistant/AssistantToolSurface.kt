@@ -13,9 +13,11 @@ import io.element.android.features.androidtoolbox.api.AndroidToolLauncherFactory
 /** Main-thread window lease. The native node transport must separately authorise each invocation. */
 @SingleIn(AppScope::class)
 @Inject
-class AssistantToolSurface(factory: AndroidToolLauncherFactory) {
+class AssistantToolSurface(private val factory: AndroidToolLauncherFactory) {
     private var binding: Binding? = null
     val launcher = factory.create { binding?.isVisible?.invoke() == true }
+
+    fun forInvocation(isAuthorised: () -> Boolean) = factory.create { binding?.isVisible?.invoke() == true && isAuthorised() }
 
     fun bind(owner: Any, isVisible: () -> Boolean) {
         binding = Binding(owner, isVisible)

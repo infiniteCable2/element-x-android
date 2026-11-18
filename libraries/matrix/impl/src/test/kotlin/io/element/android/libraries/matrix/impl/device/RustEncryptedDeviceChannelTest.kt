@@ -118,6 +118,7 @@ class RustEncryptedDeviceChannelTest {
         coVerify { task.cancel() }
         coVerify { task.destroy() }
         lifetime.cancel()
+        assertThat(channel.isActive).isFalse()
         assertThat(channel.send(types.single(), "{}").isFailure).isTrue()
         coVerify(exactly = 0) { sdk.sendEncryptedToDeviceMessage(any(), any(), any()) }
     }

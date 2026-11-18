@@ -43,14 +43,15 @@ class OpenClawNodeConnection(
     private var previousToken: String? = null
     private val pending = mutableMapOf<String, String>()
 
-    suspend fun receive(frame: JsonObject) {
+    suspend fun receive(frame: JsonObject, deadline: OpenClawInvokeDeadline? = null) {
         checkCurrent()
         when (frame.text("type")) {
             "event" -> when (frame.text("event")) {
                 "connect.challenge" -> connect(frame["payload"] as? JsonObject ?: fail())
                 "node.invoke.request" -> {
                     check(mutablePhase.value == Phase.Ready) { "The node is not ready." }
-                    val result = checkNotNull(nodeTools).invoke(frame["payload"] as? JsonObject ?: fail()) ?: fail()
+                    check(deadline != null && deadline.remainingMs() > 0) { "The original invocation deadline is unavailable or expired." }
+                    val result = checkNotNull(nodeTools).invoke(frame["payload"] as? JsonObject ?: fail(), deadline) ?: fail()
                     checkCurrent()
                     request("node.invoke.result", result)
                 }

@@ -16,6 +16,7 @@ import io.element.android.features.androidtoolbox.api.AssistantNodePairing
 import io.element.android.features.androidtoolbox.api.MatrixNodeCarrier
 import io.element.android.features.androidtoolbox.api.OpenClawDeviceAuthStore
 import io.element.android.features.androidtoolbox.api.OpenClawDeviceIdentityStore
+import io.element.android.features.androidtoolbox.api.OpenClawInvokeDeadline
 import io.element.android.features.androidtoolbox.api.OpenClawNodeBinding
 import io.element.android.features.androidtoolbox.api.OpenClawNodeBindingStore
 import io.element.android.features.androidtoolbox.api.OpenClawNodeConnection
@@ -43,7 +44,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import kotlinx.serialization.json.JsonObject
 import kotlin.time.Duration.Companion.seconds
 
 /** One exact verified Matrix peer plus one native node grant. Pairing never grants foreground app-control rights. */
@@ -59,6 +59,7 @@ class AssistantNodeCoordinator(
     private val bindings: OpenClawNodeBindingStore,
     private val toolbox: AndroidToolbox,
     private val surface: AssistantToolSurface,
+    private val clock: AssistantNodeClock,
 ) : AssistantNodePairing {
     private val active = Mutex()
 
@@ -111,14 +112,21 @@ class AssistantNodeCoordinator(
             val peer = MatrixDevicePeer(UserId(binding.peerUserId), DeviceId(binding.peerDeviceId), requireVerified = true)
             val channel = channels.create(client, peer, setOf(MatrixNodeCarrier.EVENT_TYPE))
             suspend fun current() = selected() != null && isInvocationCurrent() && channel.isActive
-            val carrier = MatrixNodeCarrier(binding.roomId)
+            val carrier = MatrixNodeCarrier(binding.roomId, clock::elapsedRealtimeMs)
             val incoming = channel.messages.produceIn(this)
             var executing = false
+            var invokeDeadline: OpenClawInvokeDeadline? = null
+            fun canHandoff() = executing && !pairingOnly && isInvocationCurrent() && channel.isActive && (invokeDeadline?.remainingMs() ?: 0) > 0
+            val executionLauncher = surface.forInvocation(::canHandoff)
             // Catalog describes opted-in installed tools. Execution independently needs this live assistant attempt.
             val catalogSession = AndroidToolSession(toolbox, launcher) { selected()?.first?.toolCapabilities.orEmpty() }
-            val executeSession = AndroidToolSession(toolbox, launcher) {
+            val executeSession = AndroidToolSession(toolbox, executionLauncher) {
                 val selection = selected()
-                if (executing && !pairingOnly && isInvocationCurrent() && channel.isActive) selection?.first?.toolCapabilities.orEmpty() else emptySet()
+                if (canHandoff()) {
+                    selection?.first?.toolCapabilities.orEmpty()
+                } else {
+                    emptySet()
+                }
             }
             val connection = OpenClawNodeConnection(
                 binding.gatewayId,
@@ -131,6 +139,15 @@ class AssistantNodeCoordinator(
                 send = { frame -> channel.send(MatrixNodeCarrier.EVENT_TYPE, carrier.frame(frame)).getOrThrow() },
                 onPaired = { if (setup != null) bindings.save(binding).getOrThrow() },
             )
+            suspend fun receiveFrame() {
+                val frame = incoming.nextFrame(carrier)
+                invokeDeadline = frame.deadline
+                try {
+                    connection.receive(frame.value, frame.deadline)
+                } finally {
+                    invokeDeadline = null
+                }
+            }
             val watchdog = launch {
                 while (true) {
                     delay(1.seconds)
@@ -150,12 +167,12 @@ class AssistantNodeCoordinator(
                     check(current())
                     channel.send(MatrixNodeCarrier.EVENT_TYPE, carrier.open()).getOrThrow()
                     while (connection.phase.value != OpenClawNodeConnection.Phase.Ready) {
-                        connection.receive(incoming.nextFrame(carrier))
+                        receiveFrame()
                     }
                 }
                 executing = !pairingOnly
                 if (!pairingOnly) {
-                    while (true) connection.receive(incoming.nextFrame(carrier))
+                    while (true) receiveFrame()
                 }
             } finally {
                 executing = false
@@ -174,10 +191,10 @@ class AssistantNodeCoordinator(
 
     private suspend fun ReceiveChannel<EncryptedDeviceMessage>.nextFrame(
         carrier: MatrixNodeCarrier,
-    ): JsonObject {
+    ): MatrixNodeCarrier.Incoming.Frame {
         while (true) {
             when (val message = carrier.receive(receive().contentJson)) {
-                is MatrixNodeCarrier.Incoming.Frame -> return message.value
+                is MatrixNodeCarrier.Incoming.Frame -> return message
                 MatrixNodeCarrier.Incoming.Ignored -> Unit
                 else -> error("The verified native node link ended.")
             }

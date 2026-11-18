@@ -62,6 +62,22 @@ class AndroidActivityLauncherTest : RobolectricTest() {
     }
 
     @Test
+    fun `revocation during Android activity resolution prevents the actual handoff`() {
+        every { manager.resolveActivity(any<Intent>(), any<Int>()) } answers {
+            visible = false
+            ResolveInfo().apply {
+                activityInfo = ActivityInfo().apply {
+                    packageName = action.packageName
+                    name = "MapsActivity"
+                    applicationInfo = ApplicationInfo().apply { packageName = action.packageName }
+                }
+            }
+        }
+        assertThat((launcher.submit(action) as AndroidToolResult.Failure).reason).isEqualTo(AndroidToolResult.Reason.NOT_AUTHORIZED)
+        verify(exactly = 0) { context.startActivity(any()) }
+    }
+
+    @Test
     fun `visibility and both lock states prevent submission`() {
         visible = false
         assertThat(launcher.submit(action)).isInstanceOf(AndroidToolResult.Failure::class.java)

@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -52,7 +53,7 @@ class OpenClawNodeTools(
     }
 
     /** Payload of node.invoke.request in, params for node.invoke.result out. */
-    suspend fun invoke(request: JsonObject): JsonObject? {
+    suspend fun invoke(request: JsonObject, deadline: OpenClawInvokeDeadline? = null): JsonObject? {
         val received = TimeSource.Monotonic.markNow()
         return mutex.withLock {
             val id = request.text("id") ?: return@withLock null
@@ -64,7 +65,7 @@ class OpenClawNodeTools(
             val key = if ("idempotencyKey" in request) request.text("idempotencyKey") else id
             val timeout = (request["timeoutMs"] as? JsonPrimitive)?.takeUnless { it.isString }?.longOrNull
             val params = try {
-                if ("paramsJSON" !in request) {
+                if ("paramsJSON" !in request || request["paramsJSON"] == JsonNull) {
                     JsonObject(emptyMap())
                 } else {
                     request.text("paramsJSON")?.takeIf { it.length <= MAX_PARAMS }?.let(Json::parseToJsonElement) as? JsonObject
@@ -79,10 +80,13 @@ class OpenClawNodeTools(
             // Reserve before dispatch: a cancelled handoff must not become an automatic retry.
             requests[id] = request to result(id, failure("UNAVAILABLE", "The operation was interrupted; its outcome is unknown."))
             try {
-                val execution = if (timeout == null) {
+                val remaining = listOfNotNull(
+                    timeout?.takeIf { it > 0 }?.let { (it - received.elapsedNow().inWholeMilliseconds).coerceAtLeast(0) },
+                    deadline?.remainingMs(),
+                ).minOrNull()
+                val execution = if (remaining == null) {
                     session.execute(checkNotNull(key), checkNotNull(command), checkNotNull(params))
                 } else {
-                    val remaining = (timeout - received.elapsedNow().inWholeMilliseconds).coerceAtLeast(0)
                     withTimeoutOrNull(remaining) { session.execute(checkNotNull(key), checkNotNull(command), checkNotNull(params)) }
                 }
                 val response = when (execution) {

@@ -22,7 +22,7 @@ class MatrixNodeCarrierTest {
 
     @Test
     fun `open once native frames unchanged independent sequence and close`() {
-        val carrier = MatrixNodeCarrier(room, link)
+        val carrier = carrier()
         assertThrows(IllegalStateException::class.java) { carrier.frame(frame) }
         assertThat(Json.parseToJsonElement(carrier.open())).isEqualTo(Json.parseToJsonElement(envelope("open")))
         assertThrows(IllegalStateException::class.java) { carrier.open() }
@@ -37,7 +37,7 @@ class MatrixNodeCarrierTest {
 
     @Test
     fun `wrong link is ignored but sequence gap ends this link`() {
-        val carrier = MatrixNodeCarrier(room, link)
+        val carrier = carrier()
         carrier.open()
         assertThat(carrier.receive(envelope("frame", 0).replace(link, "00000000-0000-4000-8000-000000000002")))
             .isEqualTo(MatrixNodeCarrier.Incoming.Ignored)
@@ -57,7 +57,7 @@ class MatrixNodeCarrierTest {
             "invalid",
         )
         invalid.forEach {
-            val carrier = MatrixNodeCarrier(room, link)
+            val carrier = carrier()
             carrier.open()
             assertThat(carrier.receive(it)).isEqualTo(MatrixNodeCarrier.Incoming.Invalid)
         }
@@ -65,13 +65,56 @@ class MatrixNodeCarrierTest {
 
     @Test
     fun `limit counts UTF8 bytes and an oversize outgoing frame does not consume sequence`() {
-        val carrier = MatrixNodeCarrier(room, link)
+        val carrier = carrier()
         carrier.open()
         val large = JsonObject(mapOf("text" to JsonPrimitive("語".repeat(5_000))))
         assertThrows(IllegalArgumentException::class.java) { carrier.frame(large) }
         assertThat(carrier.frame(frame)).isEqualTo(envelope("frame", 0))
         assertThat(carrier.receive(envelope("frame", 0).replace("sample", "語".repeat(5_000))))
             .isEqualTo(MatrixNodeCarrier.Incoming.Invalid)
+    }
+
+    @Test
+    fun `invoke deadline uses confirmed server time plus complete monotone elapsed time including delivery delay`() {
+        var elapsed = 1_000L
+        val carrier = carrier { elapsed }
+        carrier.open()
+        elapsed += 200
+        carrier.receive(envelope("frame", 0))
+        val incoming = carrier.receive(invokeEnvelope(1, "1000")) as MatrixNodeCarrier.Incoming.Frame
+        assertThat(incoming.deadline!!.remainingMs()).isEqualTo(758)
+        elapsed += 800
+        assertThat(incoming.deadline!!.remainingMs()).isEqualTo(0)
+        assertThat(carrier.receive(invokeEnvelope(2, "1000"))).isEqualTo(MatrixNodeCarrier.Incoming.Invalid)
+    }
+
+    @Test
+    fun `missing string fractional unsafe and elapsed deadlines cannot reach the node adapter`() {
+        for (expires in listOf(null, "\"1000\"", "1000.5", "9007199254740992", "42", "0", "-1")) {
+            val carrier = carrier()
+            carrier.open()
+            carrier.receive(envelope("frame", 0))
+            assertThat(carrier.receive(invokeEnvelope(1, expires))).isEqualTo(MatrixNodeCarrier.Incoming.Invalid)
+        }
+        val carrier = carrier()
+        carrier.open()
+        assertThat(carrier.receive(envelope("frame", 0).dropLast(1) + ",\"expires_at_ms\":1000}"))
+            .isEqualTo(MatrixNodeCarrier.Incoming.Invalid)
+    }
+
+    @Test
+    fun `replay cannot refresh original deadline and clock rollback grants no time`() {
+        var elapsed = 100L
+        val carrier = carrier { elapsed }
+        carrier.open()
+        carrier.receive(envelope("frame", 0))
+        val event = invokeEnvelope(1, "1000")
+        val accepted = carrier.receive(event) as MatrixNodeCarrier.Incoming.Frame
+        elapsed += 100
+        assertThat(carrier.receive(event)).isEqualTo(MatrixNodeCarrier.Incoming.Ignored)
+        assertThat(accepted.deadline!!.remainingMs()).isEqualTo(858)
+        elapsed = 0
+        assertThat(accepted.deadline!!.remainingMs()).isEqualTo(0)
     }
 
     @Test
@@ -90,6 +133,14 @@ class MatrixNodeCarrierTest {
             assertThat(result.isFailure).isTrue()
             assertThat(result.exceptionOrNull().toString()).doesNotContain(secret)
         }
+    }
+
+    private fun carrier(clock: () -> Long = { 0L }) = MatrixNodeCarrier(room, clock, link)
+
+    private fun invokeEnvelope(seq: Long, expires: String?): String {
+        val native = """{"type":"event","event":"node.invoke.request","payload":{"id":"sample-invoke"}}"""
+        return envelope("frame", seq).replace(frame.toString(), native).dropLast(1) +
+            (expires?.let { ",\"expires_at_ms\":$it" } ?: "") + "}"
     }
 
     private fun envelope(kind: String, seq: Long? = null): String =

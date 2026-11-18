@@ -14,11 +14,13 @@ import io.element.android.features.androidtoolbox.api.OpenClawDeviceIdentity
 import io.element.android.features.androidtoolbox.api.OpenClawDeviceIdentityStore
 import io.element.android.features.androidtoolbox.api.OpenClawDeviceProof
 import io.element.android.features.androidtoolbox.api.OpenClawDeviceTokenSlot
+import io.element.android.features.androidtoolbox.api.OpenClawInvokeDeadline
 import io.element.android.features.androidtoolbox.api.OpenClawNodeConnection
 import io.element.android.features.androidtoolbox.api.OpenClawNodeSetup
 import io.element.android.features.androidtoolbox.api.OpenClawNodeTools
 import io.element.android.features.androidtoolbox.test.RecordingAndroidToolLauncher
 import io.element.android.tests.testutils.testCoroutineDispatchers
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -32,7 +34,7 @@ import java.util.Base64
 class OpenClawNodeConnectionTest {
     @Test
     fun `native bootstrap challenge hello catalog invocation and result are a single authenticated flow`() = runTest {
-        val fixture = Fixture()
+        val fixture = Fixture(this)
         val node = fixture.node(setup = true)
         assertThat(fixture.sent).isEmpty()
         assertThat(fixture.store.reads).isEqualTo(0)
@@ -57,7 +59,8 @@ class OpenClawNodeConnectionTest {
         node.receive(
             json(
                 """{"type":"event","event":"node.invoke.request","payload":{"id":"invoke-1","nodeId":"sample-node","command":"maps.search","paramsJSON":"{\"query\":\"Sample museum\"}"}}"""
-            )
+            ),
+            OpenClawInvokeDeadline(10_000) { 1234 },
         )
         assertThat(fixture.launcher.submissions).hasSize(1)
         assertThat(fixture.sent.last()["method"]).isEqualTo(JsonPrimitive("node.invoke.result"))
@@ -67,7 +70,7 @@ class OpenClawNodeConnectionTest {
 
     @Test
     fun `reconnect uses deviceToken only and signs the exact same token`() = runTest {
-        val fixture = Fixture()
+        val fixture = Fixture(this)
         fixture.store.entry = OpenClawDeviceAuthEntry("saved-device-token", "node", emptyList(), 1)
         fixture.node(setup = false).receive(challenge())
         val auth = fixture.sent.single().params()["auth"]!!.jsonObject
@@ -78,7 +81,7 @@ class OpenClawNodeConnectionTest {
 
     @Test
     fun `explicit setup cannot silently fall back to stored grant and no grant no reconnect`() = runTest {
-        val fixture = Fixture()
+        val fixture = Fixture(this)
         fixture.store.entry = OpenClawDeviceAuthEntry("old-grant", "node", emptyList(), 1)
         val node = fixture.node(setup = true)
         node.receive(challenge())
@@ -86,7 +89,7 @@ class OpenClawNodeConnectionTest {
         assertThat(runCatching { node.receive(fixture.response(json("{}"), ok = false)) }.isFailure).isTrue()
         assertThat(fixture.sent).hasSize(1)
         assertThat(fixture.store.entry!!.token).isEqualTo("old-grant")
-        val empty = Fixture()
+        val empty = Fixture(this)
         assertThat(runCatching { empty.node(setup = false).receive(challenge()) }.isFailure).isTrue()
         assertThat(empty.sent).isEmpty()
     }
@@ -100,21 +103,21 @@ class OpenClawNodeConnectionTest {
             """{"type":"hello-ok","protocol":4,"auth":{"role":"node","scopes":[]}}""",
         )
         invalid.forEach {
-            val fixture = Fixture()
+            val fixture = Fixture(this)
             val node = fixture.node(true)
             node.receive(challenge())
             assertThat(runCatching { node.receive(fixture.response(json(it))) }.isFailure).isTrue()
             assertThat(fixture.store.entry).isNull()
             assertThat(fixture.paired).isFalse()
         }
-        val fixture = Fixture()
+        val fixture = Fixture(this)
         fixture.store.failWrite = true
         val node = fixture.node(true)
         node.receive(challenge())
         assertThat(runCatching { node.receive(fixture.response(hello())) }.isFailure).isTrue()
         assertThat(fixture.paired).isFalse()
         assertThat(fixture.sent).hasSize(1)
-        val rejectedCatalog = Fixture()
+        val rejectedCatalog = Fixture(this)
         val other = rejectedCatalog.node(true)
         other.receive(challenge())
         other.receive(rejectedCatalog.response(hello()))
@@ -124,11 +127,11 @@ class OpenClawNodeConnectionTest {
 
     @Test
     fun `binding invalidation while signing cannot send credentials and invocation before ready cannot launch`() = runTest {
-        val fixture = Fixture()
+        val fixture = Fixture(this)
         fixture.afterSign = { fixture.current = false }
         assertThat(runCatching { fixture.node(true).receive(challenge()) }.isFailure).isTrue()
         assertThat(fixture.sent).isEmpty()
-        val other = Fixture()
+        val other = Fixture(this)
         val node = other.node(true)
         val invocation = json("""{"type":"event","event":"node.invoke.request","payload":{}}""")
         assertThat(runCatching { node.receive(invocation) }.isFailure).isTrue()
@@ -138,7 +141,7 @@ class OpenClawNodeConnectionTest {
         assertThat(other.store.reads).isEqualTo(0)
     }
 
-    private class Fixture {
+    private class Fixture(private val scope: TestScope) {
         val sent = mutableListOf<JsonObject>()
         val store = AuthStore()
         val launcher = RecordingAndroidToolLauncher()
@@ -160,7 +163,7 @@ class OpenClawNodeConnectionTest {
                 """{"url":"wss://example.org","bootstrapToken":"synthetic-bootstrap"}""".toByteArray()
             )
             return OpenClawNodeConnection("sample-gateway", "test", identities, store, { id ->
-                OpenClawNodeTools(id, AndroidToolSession(DefaultAndroidToolbox(setOf(GoogleMapsToolModule()), testCoroutineDispatchers()), launcher) {
+                OpenClawNodeTools(id, AndroidToolSession(DefaultAndroidToolbox(setOf(GoogleMapsToolModule()), scope.testCoroutineDispatchers()), launcher) {
                     if (current) setOf("maps") else emptySet()
                 })
             }, if (setup) OpenClawNodeSetup.parse(code).getOrThrow() else null, { current }, { sent.add(it) }, { paired = true })

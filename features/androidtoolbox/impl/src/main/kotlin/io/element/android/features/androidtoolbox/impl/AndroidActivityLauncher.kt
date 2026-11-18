@@ -32,7 +32,7 @@ internal class AndroidActivityLauncher(private val context: Context, private val
     override fun isInteractive(): Boolean {
         val keyguard = context.getSystemService(KeyguardManager::class.java) ?: return false
         val power = context.getSystemService(PowerManager::class.java) ?: return false
-        return isVisible() && power.isInteractive && !keyguard.isDeviceLocked && !keyguard.isKeyguardLocked
+        return power.isInteractive && !keyguard.isDeviceLocked && !keyguard.isKeyguardLocked && isVisible()
     }
 
     override fun isAppAvailable(packageName: String): Boolean = try {
@@ -50,6 +50,7 @@ internal class AndroidActivityLauncher(private val context: Context, private val
             if (intent.resolveActivity(context.packageManager) == null) {
                 return AndroidToolResult.Failure(AndroidToolResult.Reason.NOT_AVAILABLE, "No installed app can handle this action.")
             }
+            if (!isInteractive()) return AndroidToolResult.Failure(AndroidToolResult.Reason.NOT_AUTHORIZED, "The assistant handoff was revoked.")
             context.startActivity(intent)
             // startActivity is a handoff, not proof of navigation, playback or completion inside another app.
             AndroidToolResult.Success(buildJsonObject {

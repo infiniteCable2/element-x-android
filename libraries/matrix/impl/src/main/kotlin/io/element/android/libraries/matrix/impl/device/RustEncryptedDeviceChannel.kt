@@ -102,14 +102,14 @@ internal class RustEncryptedDeviceChannel(
             subscription.cancelAndDestroy()
         }
     }.buffer(capacity = 64).flowOn(dispatchers.io).onEach {
-        check(isActive) { "The Matrix device channel was revoked." }
+        check(this@RustEncryptedDeviceChannel.isActive) { "The Matrix device channel was revoked." }
     }
 
     override suspend fun awaitReady() = subscriptionReady.await()
 
     override suspend fun send(eventType: String, contentJson: String): Result<Unit> = withContext(dispatchers.io) {
         runCatchingExceptions {
-            check(isActive) { "The Matrix device channel is closed." }
+            check(this@RustEncryptedDeviceChannel.isActive) { "The Matrix device channel is closed." }
             require(eventType in types && contentJson.length <= MAX_DEVICE_MESSAGE_CHARS)
             val failures = client.sendEncryptedToDeviceMessage(eventType, mapOf(peer.userId.value to listOf(peer.deviceId.value)), contentJson).failures
             check(failures.isEmpty()) { "The encrypted message could not be submitted to the selected device." }
