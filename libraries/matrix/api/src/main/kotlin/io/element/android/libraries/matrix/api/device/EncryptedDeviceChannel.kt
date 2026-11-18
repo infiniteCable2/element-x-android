@@ -21,6 +21,9 @@ data class EncryptedDeviceMessage(val eventType: String, val contentJson: String
  * This channel is a transport primitive, not an application pairing or authorisation grant.
  */
 interface EncryptedDeviceChannel {
+    /** Immediately false after logout, verification loss, overflow or collector detachment, even with queued messages. */
+    val isActive: Boolean
+
     /** Collection ends on logout or transport failure. There is no replay of past messages. */
     val messages: Flow<EncryptedDeviceMessage>
 

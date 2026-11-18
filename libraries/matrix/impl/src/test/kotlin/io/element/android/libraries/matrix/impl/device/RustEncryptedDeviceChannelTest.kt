@@ -9,6 +9,7 @@ import com.google.common.truth.Truth.assertThat
 import io.element.android.libraries.matrix.api.core.DeviceId
 import io.element.android.libraries.matrix.api.core.UserId
 import io.element.android.libraries.matrix.api.device.MatrixDevicePeer
+import io.element.android.libraries.matrix.api.device.EncryptedDeviceMessage
 import io.element.android.libraries.matrix.impl.rtc.A_SENDER_DEVICE
 import io.element.android.libraries.matrix.impl.rtc.anEncryptionInfo
 import io.element.android.tests.testutils.testCoroutineDispatchers
@@ -70,9 +71,15 @@ class RustEncryptedDeviceChannelTest {
             task
         }
         val channel = RustEncryptedDeviceChannel(sdk, backgroundScope, testCoroutineDispatchers(), strict, types)
-        val collection = async { runCatching { channel.messages.toList() } }
-        subscribed.await().onMessage(grey)
+        val delivered = mutableListOf<EncryptedDeviceMessage>()
+        val collection = async { runCatching { channel.messages.toList(delivered) } }
+        val listener = subscribed.await()
+        listener.onMessage(message)
+        listener.onMessage(grey)
+        assertThat(channel.isActive).isFalse()
         assertThat(collection.await().exceptionOrNull()).isInstanceOf(IllegalStateException::class.java)
+        assertThat(delivered).isEmpty()
+        assertThat(channel.send(types.single(), "{}").isFailure).isTrue()
         coVerify(exactly = 1) { task.cancel() }
         coVerify(exactly = 1) { task.destroy() }
     }

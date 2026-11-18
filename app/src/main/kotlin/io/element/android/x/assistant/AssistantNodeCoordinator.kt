@@ -104,20 +104,21 @@ class AssistantNodeCoordinator(
         isInvocationCurrent: () -> Boolean,
     ) = coroutineScope {
         suspend fun selected() = peers.resolve(binding.sessionId, binding.roomId, binding.peerDeviceId)?.takeIf { it.second == binding }
-        suspend fun current() = isInvocationCurrent() && selected() != null
-        check(current())
+        check(selected() != null && isInvocationCurrent())
         val client = clients.getOrRestore(SessionId(binding.sessionId)).getOrThrow()
         val room = client.getJoinedRoom(RoomId(binding.roomId)) ?: error("The assistant room is unavailable.")
         try {
             val peer = MatrixDevicePeer(UserId(binding.peerUserId), DeviceId(binding.peerDeviceId), requireVerified = true)
             val channel = channels.create(client, peer, setOf(MatrixNodeCarrier.EVENT_TYPE))
+            suspend fun current() = selected() != null && isInvocationCurrent() && channel.isActive
             val carrier = MatrixNodeCarrier(binding.roomId)
             val incoming = channel.messages.produceIn(this)
             var executing = false
             // Catalog describes opted-in installed tools. Execution independently needs this live assistant attempt.
             val catalogSession = AndroidToolSession(toolbox, launcher) { selected()?.first?.toolCapabilities.orEmpty() }
             val executeSession = AndroidToolSession(toolbox, launcher) {
-                if (executing && !pairingOnly && current()) selected()?.first?.toolCapabilities.orEmpty() else emptySet()
+                val selection = selected()
+                if (executing && !pairingOnly && isInvocationCurrent() && channel.isActive) selection?.first?.toolCapabilities.orEmpty() else emptySet()
             }
             val connection = OpenClawNodeConnection(
                 binding.gatewayId,

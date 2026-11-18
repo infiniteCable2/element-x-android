@@ -236,6 +236,7 @@ class AssistantNodeCoordinatorTest {
         var skipSequence = false
         var answerOpen = true
         var closed = false
+        override val isActive: Boolean get() = !closed
         val opened = CompletableDeferred<Unit>()
         val catalogPublished = CompletableDeferred<Unit>()
         val result = CompletableDeferred<JsonObject>()

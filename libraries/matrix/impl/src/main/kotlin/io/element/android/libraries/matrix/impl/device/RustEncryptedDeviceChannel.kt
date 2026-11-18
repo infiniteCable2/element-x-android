@@ -22,6 +22,7 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.job
 import kotlinx.coroutines.withContext
@@ -29,6 +30,7 @@ import org.matrix.rustcomponents.sdk.Client
 import org.matrix.rustcomponents.sdk.ShieldState
 import org.matrix.rustcomponents.sdk.ToDeviceMessage
 import org.matrix.rustcomponents.sdk.ToDeviceMessageListener
+import java.util.concurrent.atomic.AtomicBoolean
 
 @ContributesBinding(AppScope::class)
 class RustEncryptedDeviceChannelFactory(private val dispatchers: CoroutineDispatchers) : EncryptedDeviceChannelFactory {
@@ -50,6 +52,8 @@ internal class RustEncryptedDeviceChannel(
 ) : EncryptedDeviceChannel {
     private val types = eventTypes.toSet()
     private val subscriptionReady = CompletableDeferred<Unit>()
+    private val available = AtomicBoolean(true)
+    override val isActive: Boolean get() = available.get() && sessionScope.isActive
 
     init {
         require(peer.deviceId.value.isNotBlank() && peer.deviceId.value != "*")
@@ -57,12 +61,16 @@ internal class RustEncryptedDeviceChannel(
     }
 
     override val messages = callbackFlow {
-        check(sessionScope.isActive) { "The Matrix session is closed." }
-        val lifetime = sessionScope.coroutineContext.job.invokeOnCompletion { close() }
+        check(this@RustEncryptedDeviceChannel.isActive) { "The Matrix device channel is closed." }
+        val lifetime = sessionScope.coroutineContext.job.invokeOnCompletion {
+            available.set(false)
+            close()
+        }
         val subscription = try {
             client.subscribeToCustomToDeviceMessages(types.toList(), object : ToDeviceMessageListener {
                 override fun onMessage(message: ToDeviceMessage) {
                     if (!sessionScope.isActive) {
+                        available.set(false)
                         close()
                         return
                     }
@@ -70,30 +78,38 @@ internal class RustEncryptedDeviceChannel(
                     if (peer.requireVerified && message.eventType in types && info?.senderId == peer.userId.value &&
                         info.senderDeviceId == peer.deviceId.value && info.shieldState != ShieldState.None
                     ) {
+                        available.set(false)
                         close(IllegalStateException("The selected device is no longer verified."))
                         return
                     }
                     val trusted = message.forPeer(peer, types) ?: return
-                    if (trySend(trusted).isFailure) close(IllegalStateException("The encrypted device message queue overflowed."))
+                    if (trySend(trusted).isFailure) {
+                        available.set(false)
+                        close(IllegalStateException("The encrypted device message queue overflowed."))
+                    }
                 }
             })
         } catch (error: Exception) {
+            available.set(false)
             subscriptionReady.completeExceptionally(error)
             lifetime.dispose()
             throw error
         }
         subscriptionReady.complete(Unit)
         awaitClose {
+            available.set(false)
             lifetime.dispose()
             subscription.cancelAndDestroy()
         }
-    }.buffer(capacity = 64).flowOn(dispatchers.io)
+    }.buffer(capacity = 64).flowOn(dispatchers.io).onEach {
+        check(isActive) { "The Matrix device channel was revoked." }
+    }
 
     override suspend fun awaitReady() = subscriptionReady.await()
 
     override suspend fun send(eventType: String, contentJson: String): Result<Unit> = withContext(dispatchers.io) {
         runCatchingExceptions {
-            check(sessionScope.isActive) { "The Matrix session is closed." }
+            check(isActive) { "The Matrix device channel is closed." }
             require(eventType in types && contentJson.length <= MAX_DEVICE_MESSAGE_CHARS)
             val failures = client.sendEncryptedToDeviceMessage(eventType, mapOf(peer.userId.value to listOf(peer.deviceId.value)), contentJson).failures
             check(failures.isEmpty()) { "The encrypted message could not be submitted to the selected device." }
