@@ -151,8 +151,9 @@ class AssistantVoiceController(
             nodeJob = scope.launch(Dispatchers.Main.immediate) {
                 val first = state.first { it.phase in readyPhases || it.phase in terminalPhases }
                 if (first.phase in readyPhases) {
-                    nodes.runAssistant(target.sessionId.value, target.roomId.value) {
-                        attemptActive && controller === call && state.value.phase in readyPhases
+                    nodes.runAssistant(target.sessionId.value, target.roomId.value) { userId, deviceId ->
+                        attemptActive && controller === call && canStart() &&
+                            call.state.value?.isReadyAssistantNodePeer(attempt.presentation.value, userId, deviceId) == true
                     }
                 }
             }

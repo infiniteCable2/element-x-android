@@ -21,6 +21,7 @@ import io.element.android.call.api.rtc.MatrixRtcUnableToDecrypt
 import io.element.android.call.api.rtc.id.RoomId
 import io.element.android.call.api.rtc.id.UserId
 import io.element.android.features.callnative.impl.AssistantVoicePeer
+import io.element.android.features.callnative.impl.AssistantVoicePresentation
 import io.element.android.features.callnative.impl.TalkActivity
 import io.element.android.features.callnative.impl.TalkSessionState
 import kotlinx.collections.immutable.persistentMapOf
@@ -43,6 +44,19 @@ class AssistantVoiceStateTest {
         TalkActivity.Work(2, 1, 1),
         TalkActivity.Output(1, TalkActivity.OutputState.SUBMITTED, TalkActivity.OutputPurpose.SPEECH),
     )
+
+    @Test
+    fun `native node lease requires the exact live ready RTC device and encryption`() {
+        val presentation = AssistantVoicePresentation(ready, talks(activity))
+        assertThat(snapshot.isReadyAssistantNodePeer(presentation, peer.userId.value, "REMOTE")).isTrue()
+        assertThat(snapshot.isReadyAssistantNodePeer(presentation, peer.userId.value, "OTHER")).isFalse()
+        assertThat(snapshot.isReadyAssistantNodePeer(presentation, "@other:example.org", "REMOTE")).isFalse()
+        assertThat(snapshot.copy(isMicrophoneMuted = true).isReadyAssistantNodePeer(presentation, peer.userId.value, "REMOTE")).isTrue()
+        assertThat(snapshot.copy(roster = roster(peer.copy(connection = MatrixRtcConnectionState.CONNECTING)))
+            .isReadyAssistantNodePeer(presentation, peer.userId.value, "REMOTE")).isFalse()
+        assertThat(snapshot.copy(frameEncryption = persistentMapOf("peer" to MatrixRtcFrameEncryptionState.MISSING_KEY))
+            .isReadyAssistantNodePeer(presentation, peer.userId.value, "REMOTE")).isFalse()
+    }
 
     @Test
     fun `loud audio without status capability is only connected`() {

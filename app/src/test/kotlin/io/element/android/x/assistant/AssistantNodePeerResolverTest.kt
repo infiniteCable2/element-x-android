@@ -127,6 +127,15 @@ class AssistantNodePeerResolverTest {
     }
 
     @Test
+    fun `membership changing during verification cannot authorise the old DM shape`() = runTest {
+        afterIdentity = { count = 3 }
+        assertThat(resolve()).isNull()
+        count = 2
+        afterIdentity = { memberId = UserId("@replacement:example.org") }
+        assertThat(resolve()).isNull()
+    }
+
+    @Test
     fun `PIN lock and target change during identity lookup cannot authorise a stale selection`() = runTest {
         afterIdentity = { lockState.value = LockScreenLockState.Locked }
         assertThat(resolve()).isNull()

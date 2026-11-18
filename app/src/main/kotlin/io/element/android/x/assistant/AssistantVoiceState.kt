@@ -11,6 +11,7 @@ import io.element.android.call.api.rtc.MatrixRtcConnectionState
 import io.element.android.call.api.rtc.MatrixRtcFrameEncryptionState
 import io.element.android.call.api.rtc.MatrixRtcTileKind
 import io.element.android.features.callnative.impl.AssistantVoicePeer
+import io.element.android.features.callnative.impl.AssistantVoicePresentation
 import io.element.android.features.callnative.impl.TalkActivity
 import io.element.android.features.callnative.impl.TalkInputOutcome
 import io.element.android.features.callnative.impl.TalkSessionState
@@ -36,6 +37,12 @@ internal data class AssistantVoiceState(
     val activity: TalkActivity? = null,
     val inputOutcome: TalkInputOutcome? = null,
 )
+
+/** Native app control must belong to the same currently ready, decryptable RTC device as the pinned node link. */
+internal fun ElementCallSnapshot.isReadyAssistantNodePeer(presentation: AssistantVoicePresentation, userId: String, deviceId: String): Boolean {
+    val exactPeers = presentation.readyPeers.filter { it.userId == userId && it.deviceId == deviceId }.toSet()
+    return toVoiceState(exactPeers, presentation.talkStates).phase.let { it == AssistantVoicePhase.Connected || it == AssistantVoicePhase.Muted }
+}
 
 internal fun ElementCallSnapshot.toVoiceState(
     readyPeers: Set<AssistantVoicePeer>,

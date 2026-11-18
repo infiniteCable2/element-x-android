@@ -7,6 +7,7 @@ package io.element.android.x.assistant
 
 import dev.zacsweers.metro.AppScope
 import dev.zacsweers.metro.ContributesBinding
+import dev.zacsweers.metro.Inject
 import dev.zacsweers.metro.SingleIn
 import io.element.android.features.androidtoolbox.api.AndroidToolLauncher
 import io.element.android.features.androidtoolbox.api.AndroidToolSession
@@ -47,7 +48,8 @@ import kotlin.time.Duration.Companion.seconds
 
 /** One exact verified Matrix peer plus one native node grant. Pairing never grants foreground app-control rights. */
 @SingleIn(AppScope::class)
-@ContributesBinding(AppScope::class, boundType = AssistantNodePairing::class)
+@ContributesBinding(AppScope::class)
+@Inject
 class AssistantNodeCoordinator(
     private val peers: AssistantNodePeerResolver,
     private val clients: MatrixClientProvider,
@@ -79,12 +81,12 @@ class AssistantNodeCoordinator(
     }
 
     /** Owned by one assistant call attempt, cancelled when that attempt ends. Hiding its window revokes app-launch rights. */
-    suspend fun runAssistant(sessionId: String, roomId: String, isInvocationCurrent: () -> Boolean) {
+    suspend fun runAssistant(sessionId: String, roomId: String, isInvocationCurrent: (String, String) -> Boolean) {
         if (!active.tryLock()) return
         try {
             val binding = bindings.load().getOrThrow() ?: return
             if (binding.sessionId != sessionId || binding.roomId != roomId) return
-            runLink(binding, null, surface.launcher, pairingOnly = false, isInvocationCurrent)
+            runLink(binding, null, surface.launcher, pairingOnly = false) { isInvocationCurrent(binding.peerUserId, binding.peerDeviceId) }
         } catch (error: CancellationException) {
             throw error
         } catch (_: Exception) {
