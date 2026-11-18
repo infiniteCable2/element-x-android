@@ -1,0 +1,123 @@
+{
+  "schemaVersion": 1,
+  "owner": "packages/gateway-client/src/device-auth.ts",
+  "ownerSHA256LF": "b9a3e2a7281092315d03491f364071cbfc31acbe9152b3f86a41a75438464a00",
+  "vectors": [
+    {
+      "name": "node-without-token",
+      "seedHex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+      "claim": {
+        "clientId": "openclaw-android",
+        "clientMode": "node",
+        "role": "node",
+        "scopes": [],
+        "signedAtMs": 1700000000000,
+        "token": null,
+        "nonce": "nonce-abc",
+        "platform": " Android ",
+        "deviceFamily": " Phone "
+      },
+      "expected": {
+        "deviceId": "21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9",
+        "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "payload": "v3|21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9|openclaw-android|node|node||1700000000000||nonce-abc|android|phone",
+        "payloadUtf8Hex": "76337c323166653331646661313534613236313632366266383534303436666432323731623762656434623661626534356161353838373765663437663937323162397c6f70656e636c61772d616e64726f69647c6e6f64657c6e6f64657c7c313730303030303030303030307c7c6e6f6e63652d6162637c616e64726f69647c70686f6e65",
+        "signature": "80WINQ36KvbNzgcR-KwN47uHQkdDyToOPmNx7a81SC_F0aVTdNjKu8XfJoe83q3LQvgG6SIMdEvZEnrP1oq4Dg"
+      }
+    },
+    {
+      "name": "canonical-operator",
+      "seedHex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+      "claim": {
+        "clientId": "openclaw-macos",
+        "clientMode": "ui",
+        "role": "operator",
+        "scopes": [
+          "operator.admin",
+          "operator.read"
+        ],
+        "signedAtMs": 1700000000000,
+        "token": "tok-123",
+        "nonce": "nonce-abc",
+        "platform": "  IOS  ",
+        "deviceFamily": "  iPhone  "
+      },
+      "expected": {
+        "deviceId": "21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9",
+        "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "payload": "v3|21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9|openclaw-macos|ui|operator|operator.admin,operator.read|1700000000000|tok-123|nonce-abc|ios|iphone",
+        "payloadUtf8Hex": "76337c323166653331646661313534613236313632366266383534303436666432323731623762656434623661626534356161353838373765663437663937323162397c6f70656e636c61772d6d61636f737c75697c6f70657261746f727c6f70657261746f722e61646d696e2c6f70657261746f722e726561647c313730303030303030303030307c746f6b2d3132337c6e6f6e63652d6162637c696f737c6970686f6e65",
+        "signature": "bnzdHEFFLTF8H0fv_Ex2B8xLJOwxZBkYO-N0QhwO1PAdoYwZIXk4mwekibnBIfv-86cQ-7y8kaXh9vEurRj6Dw"
+      }
+    },
+    {
+      "name": "preserve-order-token-and-unicode",
+      "seedHex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+      "claim": {
+        "clientId": "openclaw-android",
+        "clientMode": "node",
+        "role": "node",
+        "scopes": [
+          "operator.write",
+          "operator.read"
+        ],
+        "signedAtMs": 1700000000000,
+        "token": " token with spaces ",
+        "nonce": "nonce-café",
+        "platform": "  İOS  ",
+        "deviceFamily": "  ÄPHONE  "
+      },
+      "expected": {
+        "deviceId": "21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9",
+        "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "payload": "v3|21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9|openclaw-android|node|node|operator.write,operator.read|1700000000000| token with spaces |nonce-café|İos|Äphone",
+        "payloadUtf8Hex": "76337c323166653331646661313534613236313632366266383534303436666432323731623762656434623661626534356161353838373765663437663937323162397c6f70656e636c61772d616e64726f69647c6e6f64657c6e6f64657c6f70657261746f722e77726974652c6f70657261746f722e726561647c313730303030303030303030307c20746f6b656e207769746820737061636573207c6e6f6e63652d636166c3a97cc4b06f737cc38470686f6e65",
+        "signature": "VmKKF6xFXi1y3AGLIB-bet-k3nqQlSdoGyXXQktOpeZ1Q2JPHk_WKmk9MpfgdZafzpBvIMhKKblqdF49QPIoCQ"
+      }
+    },
+    {
+      "name": "empty-metadata-slots",
+      "seedHex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+      "claim": {
+        "clientId": "openclaw-android",
+        "clientMode": "node",
+        "role": "node",
+        "scopes": [],
+        "signedAtMs": 1700000000001,
+        "token": null,
+        "nonce": "nonce-abc",
+        "platform": null,
+        "deviceFamily": null
+      },
+      "expected": {
+        "deviceId": "21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9",
+        "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "payload": "v3|21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9|openclaw-android|node|node||1700000000001||nonce-abc||",
+        "payloadUtf8Hex": "76337c323166653331646661313534613236313632366266383534303436666432323731623762656434623661626534356161353838373765663437663937323162397c6f70656e636c61772d616e64726f69647c6e6f64657c6e6f64657c7c313730303030303030303030317c7c6e6f6e63652d6162637c7c",
+        "signature": "Fy93aAtpapgcclf4Fgh04tu-9eef3WAJBuq-TvGbwurrg19oUbhZNKLN0K-fmoTo8U6Qyw8b7qoAcbrwRi8MBQ"
+      }
+    },
+    {
+      "name": "native-unicode-whitespace",
+      "seedHex": "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+      "claim": {
+        "clientId": "openclaw-android",
+        "clientMode": "node",
+        "role": "node",
+        "scopes": [],
+        "signedAtMs": 1700000000000,
+        "token": null,
+        "nonce": "nonce-abc",
+        "platform": "  Android  ",
+        "deviceFamily": "\t PHONE\n"
+      },
+      "expected": {
+        "deviceId": "21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9",
+        "publicKey": "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",
+        "payload": "v3|21fe31dfa154a261626bf854046fd2271b7bed4b6abe45aa58877ef47f9721b9|openclaw-android|node|node||1700000000000||nonce-abc|android|phone",
+        "payloadUtf8Hex": "76337c323166653331646661313534613236313632366266383534303436666432323731623762656434623661626534356161353838373765663437663937323162397c6f70656e636c61772d616e64726f69647c6e6f64657c6e6f64657c7c313730303030303030303030307c7c6e6f6e63652d6162637c616e64726f69647c70686f6e65",
+        "signature": "80WINQ36KvbNzgcR-KwN47uHQkdDyToOPmNx7a81SC_F0aVTdNjKu8XfJoe83q3LQvgG6SIMdEvZEnrP1oq4Dg"
+      }
+    }
+  ]
+}

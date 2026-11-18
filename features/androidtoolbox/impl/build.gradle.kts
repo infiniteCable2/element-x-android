@@ -17,7 +17,12 @@ dependencies {
     api(projects.features.androidtoolbox.api)
     implementation(projects.libraries.di)
     implementation(projects.libraries.core)
+    implementation(projects.libraries.cryptography.api)
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.google.tink)
     implementation(libs.coroutines.core)
     testCommonDependencies(libs)
     testImplementation(projects.features.androidtoolbox.test)
+    testImplementation(projects.libraries.cryptography.impl)
+    testImplementation(projects.libraries.cryptography.test)
 }
