@@ -24,7 +24,11 @@ import kotlin.time.TimeSource
  * The transport must authenticate and bind [nodeId] and this session before calling this adapter.
  * This is not an authentication mechanism or a Matrix command transport.
  */
-class OpenClawNodeTools(private val nodeId: String, private val session: AndroidToolSession) {
+class OpenClawNodeTools(
+    private val nodeId: String,
+    private val session: AndroidToolSession,
+    private val catalogSession: AndroidToolSession = session,
+) {
     private val mutex = Mutex()
     private val requests = mutableMapOf<String, Pair<JsonObject, JsonObject>>()
 
@@ -35,7 +39,7 @@ class OpenClawNodeTools(private val nodeId: String, private val session: Android
     /** Params for the native node.pluginTools.update method; replaces the previous catalog. */
     suspend fun catalog(): JsonObject = buildJsonObject {
         put("tools", buildJsonArray {
-            session.catalog().forEach { tool ->
+            catalogSession.catalog().forEach { tool ->
                 add(buildJsonObject {
                     put("pluginId", "android-toolbox")
                     put("name", tool.command.replace('.', '_'))

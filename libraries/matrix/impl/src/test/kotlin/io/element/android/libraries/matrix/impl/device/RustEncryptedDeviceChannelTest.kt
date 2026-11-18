@@ -57,6 +57,27 @@ class RustEncryptedDeviceChannelTest {
     }
 
     @Test
+    fun `strict node peer requires full SDK verification and trust loss closes collection`() = runTest {
+        val strict = peer.copy(requireVerified = true)
+        val grey = message.copy(encryptionInfo = anEncryptionInfo(peer.userId.value, ShieldState.Grey(TimelineEventShieldStateCode.UNSIGNED_DEVICE)))
+        assertThat(message.forPeer(strict, types)).isNotNull()
+        assertThat(grey.forPeer(strict, types)).isNull()
+        val sdk = mockk<Client>()
+        val task = mockk<TaskHandle>(relaxed = true)
+        val subscribed = CompletableDeferred<ToDeviceMessageListener>()
+        coEvery { sdk.subscribeToCustomToDeviceMessages(any(), any()) } answers {
+            subscribed.complete(secondArg())
+            task
+        }
+        val channel = RustEncryptedDeviceChannel(sdk, backgroundScope, testCoroutineDispatchers(), strict, types)
+        val collection = async { runCatching { channel.messages.toList() } }
+        subscribed.await().onMessage(grey)
+        assertThat(collection.await().exceptionOrNull()).isInstanceOf(IllegalStateException::class.java)
+        coVerify(exactly = 1) { task.cancel() }
+        coVerify(exactly = 1) { task.destroy() }
+    }
+
+    @Test
     fun `sending is encrypted targeted and checks delivery failures`() = runTest {
         val sdk = mockk<Client>()
         coEvery { sdk.sendEncryptedToDeviceMessage(any(), any(), any()) } returns mockk {

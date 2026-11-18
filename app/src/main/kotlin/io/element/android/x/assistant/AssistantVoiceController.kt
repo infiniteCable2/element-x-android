@@ -60,6 +60,7 @@ class AssistantVoiceController(
     private val controllers: ElementCallControllers,
     private val currentCall: CurrentCallService,
     internal val toolSurface: AssistantToolSurface,
+    private val nodes: AssistantNodeCoordinator,
 ) {
     private val resolver = AssistantChatResolver(preferences, sessions, lockScreen)
     private val mutableState = MutableStateFlow(AssistantVoiceState())
@@ -130,6 +131,8 @@ class AssistantVoiceController(
         val attempt = controllers.beginAssistantVoice(target.sessionId, target.roomId, peer.userId) ?: return update(AssistantVoicePhase.Failed)
         controller = call
         controllers.setStartingFromAssistant(target.sessionId)
+        var nodeJob: Job? = null
+        var attemptActive = true
         try {
             call.startCall(ElementCallData(roomId = roomId, isAudioCall = true, isStartingCall = true))
             if (withTimeoutOrNull(8.seconds) { call.state.first { it?.callData?.roomId == roomId } } == null) {
@@ -144,6 +147,14 @@ class AssistantVoiceController(
             }
             val captionJob = scope.launch(Dispatchers.Main.immediate) {
                 attempt.captions.collect { mutableCaptions.value = it }
+            }
+            nodeJob = scope.launch(Dispatchers.Main.immediate) {
+                val first = state.first { it.phase in readyPhases || it.phase in terminalPhases }
+                if (first.phase in readyPhases) {
+                    nodes.runAssistant(target.sessionId.value, target.roomId.value) {
+                        attemptActive && controller === call && state.value.phase in readyPhases
+                    }
+                }
             }
             var signalled = false
             try {
@@ -168,6 +179,8 @@ class AssistantVoiceController(
                 captionJob.cancel()
             }
         } finally {
+            attemptActive = false
+            nodeJob?.cancel()
             attempt.close()
             mutableCaptions.value = emptyList()
             val snapshot = call.state.value

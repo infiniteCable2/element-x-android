@@ -17,6 +17,7 @@ import io.element.android.libraries.matrix.api.device.MatrixDevicePeer
 import io.element.android.libraries.matrix.impl.RustMatrixClient
 import io.element.android.libraries.matrix.impl.util.cancelAndDestroy
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
@@ -48,6 +49,7 @@ internal class RustEncryptedDeviceChannel(
     eventTypes: Set<String>,
 ) : EncryptedDeviceChannel {
     private val types = eventTypes.toSet()
+    private val subscriptionReady = CompletableDeferred<Unit>()
 
     init {
         require(peer.deviceId.value.isNotBlank() && peer.deviceId.value != "*")
@@ -64,19 +66,30 @@ internal class RustEncryptedDeviceChannel(
                         close()
                         return
                     }
+                    val info = message.encryptionInfo
+                    if (peer.requireVerified && message.eventType in types && info?.senderId == peer.userId.value &&
+                        info.senderDeviceId == peer.deviceId.value && info.shieldState != ShieldState.None
+                    ) {
+                        close(IllegalStateException("The selected device is no longer verified."))
+                        return
+                    }
                     val trusted = message.forPeer(peer, types) ?: return
                     if (trySend(trusted).isFailure) close(IllegalStateException("The encrypted device message queue overflowed."))
                 }
             })
         } catch (error: Exception) {
+            subscriptionReady.completeExceptionally(error)
             lifetime.dispose()
             throw error
         }
+        subscriptionReady.complete(Unit)
         awaitClose {
             lifetime.dispose()
             subscription.cancelAndDestroy()
         }
     }.buffer(capacity = 64).flowOn(dispatchers.io)
+
+    override suspend fun awaitReady() = subscriptionReady.await()
 
     override suspend fun send(eventType: String, contentJson: String): Result<Unit> = withContext(dispatchers.io) {
         runCatchingExceptions {
@@ -91,6 +104,7 @@ internal class RustEncryptedDeviceChannel(
 internal fun ToDeviceMessage.forPeer(peer: MatrixDevicePeer, eventTypes: Set<String>): EncryptedDeviceMessage? {
     val encryption = encryptionInfo ?: return null
     if (encryption.senderId != peer.userId.value || encryption.senderDeviceId != peer.deviceId.value || encryption.shieldState is ShieldState.Red) return null
+    if (peer.requireVerified && encryption.shieldState != ShieldState.None) return null
     if (eventType !in eventTypes || content.length > MAX_DEVICE_MESSAGE_CHARS) return null
     return EncryptedDeviceMessage(eventType, content)
 }
