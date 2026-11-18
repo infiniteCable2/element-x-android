@@ -43,6 +43,8 @@ class MatrixNodeCarrierTest {
             .isEqualTo(MatrixNodeCarrier.Incoming.Ignored)
         assertThat(carrier.receive(envelope("frame", 1))).isEqualTo(MatrixNodeCarrier.Incoming.Invalid)
         assertThat(carrier.receive(envelope("frame", 0))).isEqualTo(MatrixNodeCarrier.Incoming.Ignored)
+        assertThat(carrier.close()).isEqualTo(envelope("close"))
+        assertThat(carrier.close()).isNull()
     }
 
     @Test

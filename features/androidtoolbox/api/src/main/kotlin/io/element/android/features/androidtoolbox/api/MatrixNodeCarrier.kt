@@ -21,6 +21,7 @@ class MatrixNodeCarrier(
 ) {
     private var opened = false
     private var closed = false
+    private var closeSent = false
     private var sent = 0L
     private var received = 0L
     private var openedAtMs: Long? = null
@@ -46,7 +47,8 @@ class MatrixNodeCarrier(
 
     @Synchronized
     fun close(): String? {
-        if (!opened || closed) return null
+        if (!opened || closeSent) return null
+        closeSent = true
         closed = true
         return encode("close")
     }
@@ -65,6 +67,7 @@ class MatrixNodeCarrier(
         return when (envelope.text("kind")) {
             "close" -> if (envelope.keys == BASE_KEYS) {
                 closed = true
+                closeSent = true
                 Incoming.Closed
             } else {
                 fail()
