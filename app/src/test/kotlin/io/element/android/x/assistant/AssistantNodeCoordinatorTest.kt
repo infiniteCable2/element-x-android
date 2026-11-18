@@ -59,13 +59,11 @@ import java.util.Base64
 
 class AssistantNodeCoordinatorTest {
     @Test
-    fun `settings pairing uses strict targeted channel subscribes first and cannot execute an unsolicited Maps command`() = runTest {
+    fun `settings pairing stores the binding on the strict targeted channel without publishing a catalog`() = runTest {
         val fixture = Fixture(this)
         val result = async { fixture.pair() }
-        fixture.gateway.catalogPublished.await()
-        // The command follows the catalog ack immediately. Setup must close without executing it.
-        fixture.gateway.invocation()
         assertThat(result.await()).isEqualTo(AssistantNodePairing.Outcome.Paired)
+        assertThat(fixture.gateway.catalogPublished.isCompleted).isFalse()
         assertThat(fixture.bindingSaved).isTrue()
         assertThat(fixture.actions).isEmpty()
         assertThat(fixture.gateway.closed).isTrue()
@@ -327,11 +325,16 @@ class AssistantNodeCoordinatorTest {
                     val native = value["frame"]!!.jsonObject
                     when (native["method"]) {
                         JsonPrimitive("connect") -> {
-                            connectAuth = native["params"]!!.jsonObject["auth"]!!.jsonObject
+                            val params = native["params"]!!.jsonObject
+                            check(params["client"]!!.jsonObject["id"] == JsonPrimitive("node-host") && params["caps"] == null)
+                            connectAuth = params["auth"]!!.jsonObject
                             if (skipSequence) seq++
                             ack(native, buildJsonObject {
                                 put("type", "hello-ok")
                                 put("protocol", 4)
+                                if (connectAuth!!.containsKey("bootstrapToken")) {
+                                    put("features", Json.parseToJsonElement("""{"methods":[],"events":[]}"""))
+                                }
                                 put("auth", buildJsonObject {
                                     put("role", if (operatorHello) "operator" else "node")
                                     put("scopes", Json.parseToJsonElement("[]"))
@@ -340,6 +343,7 @@ class AssistantNodeCoordinatorTest {
                             })
                         }
                         JsonPrimitive("node.pluginTools.update") -> {
+                            check(connectAuth!!.containsKey("deviceToken"))
                             ack(native, JsonObject(emptyMap()))
                             catalogPublished.complete(Unit)
                         }

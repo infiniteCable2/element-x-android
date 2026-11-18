@@ -18,8 +18,8 @@ class OpenClawNodeSetup private constructor(val bootstrapToken: String) {
             val encoded = if (trimmed.startsWith("oc-pair://", ignoreCase = true)) trimmed.substring(10) else trimmed
             val bytes = Base64.getUrlDecoder().decode(encoded)
             val value = Json.parseToJsonElement(bytes.toString(Charsets.UTF_8)) as? JsonObject ?: error("Invalid setup code.")
-            require(value.keys.all { it in setOf("url", "bootstrapToken") } && value.text("url") != null)
-            // The URL is native setup metadata. Matrix remains the only transport; never open it.
+            require(value.keys.all { it in setOf("url", "bootstrapToken", "expiresAtMs") } && value.text("url") != null)
+            // The URL and expiry are metadata. Matrix is the transport and the gateway enforces the expiry.
             OpenClawNodeSetup(checkNotNull(value.text("bootstrapToken")))
         }.recoverCatching { throw IllegalArgumentException("A native node-only setup code is required.") }
     }

@@ -11,7 +11,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
-import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
@@ -49,7 +48,7 @@ class OpenClawNodeConnection(
             "event" -> when (frame.text("event")) {
                 "connect.challenge" -> connect(frame["payload"] as? JsonObject ?: fail())
                 "node.invoke.request" -> {
-                    check(mutablePhase.value == Phase.Ready) { "The node is not ready." }
+                    check(!initialSetup && mutablePhase.value == Phase.Ready) { "The node is not ready to invoke tools." }
                     check(deadline != null && deadline.remainingMs() > 0) { "The original invocation deadline is unavailable or expired." }
                     val result = checkNotNull(nodeTools).invoke(frame["payload"] as? JsonObject ?: fail(), deadline) ?: fail()
                     checkCurrent()
@@ -82,7 +81,7 @@ class OpenClawNodeConnection(
         previousToken = saved?.token
         val token = if (initialSetup) checkNotNull(bootstrap) else saved?.token ?: fail()
         val proof = identities.signV3(OpenClawDeviceAuthClaim(
-            clientId = "openclaw-android",
+            clientId = CLIENT_ID,
             clientMode = "node",
             role = "node",
             scopes = emptyList(),
@@ -102,7 +101,7 @@ class OpenClawNodeConnection(
             put("minProtocol", 4)
             put("maxProtocol", 4)
             put("client", buildJsonObject {
-                put("id", "openclaw-android")
+                put("id", CLIENT_ID)
                 put("displayName", "Element")
                 put("version", version)
                 put("platform", "android")
@@ -111,7 +110,6 @@ class OpenClawNodeConnection(
             })
             put("role", "node")
             put("scopes", JsonArray(emptyList()))
-            put("caps", buildJsonArray { add(JsonPrimitive("android-toolbox")) })
             put("commands", JsonArray(commands.map(::JsonPrimitive)))
             put("auth", buildJsonObject { put(if (initialSetup) "bootstrapToken" else "deviceToken", token) })
             put("device", buildJsonObject {
@@ -142,14 +140,18 @@ class OpenClawNodeConnection(
                 check(credentials.saveToken(slot(), token, replacesStoredToken = previousToken).getOrThrow()) { "The node grant changed." }
                 previousToken = null
                 checkCurrent()
-                mutablePhase.value = Phase.PublishingTools
-                request("node.pluginTools.update", checkNotNull(nodeTools).catalog())
+                if (initialSetup) {
+                    // The unpinned bootstrap link only grants a credential. Its RPC surface is empty.
+                    onPaired()
+                    checkCurrent()
+                    mutablePhase.value = Phase.Ready
+                } else {
+                    mutablePhase.value = Phase.PublishingTools
+                    request("node.pluginTools.update", checkNotNull(nodeTools).catalog())
+                }
             }
             "node.pluginTools.update" -> {
                 check(mutablePhase.value == Phase.PublishingTools)
-                checkCurrent()
-                onPaired()
-                checkCurrent()
                 mutablePhase.value = Phase.Ready
             }
         }
@@ -175,4 +177,8 @@ class OpenClawNodeConnection(
     private fun slot() = OpenClawDeviceTokenSlot(gatewayId, checkNotNull(identity).deviceId, "node")
 
     private fun fail(): Nothing = throw IllegalArgumentException("Invalid native node frame.")
+
+    private companion object {
+        const val CLIENT_ID = "node-host"
+    }
 }

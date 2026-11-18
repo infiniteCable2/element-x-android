@@ -125,8 +125,11 @@ class MatrixNodeCarrierTest {
         val secret = "synthetic-bootstrap-secret"
         val valid = code("""{"url":"wss://example.org","bootstrapToken":"$secret"}""")
         assertThat(OpenClawNodeSetup.parse(valid).getOrThrow().bootstrapToken).isEqualTo(secret)
+        val native = code("""{"url":"wss://example.org","bootstrapToken":"$secret","expiresAtMs":1700000060000}""")
+        assertThat(OpenClawNodeSetup.parse(native).getOrThrow().bootstrapToken).isEqualTo(secret)
         listOf(
             code("""{"url":"wss://example.org","token":"$secret"}"""),
+            code("""{"url":"wss://example.org","bootstrapToken":"$secret","token":"other"}"""),
             code("""{"url":"wss://example.org","bootstrapToken":"$secret","password":"other"}"""),
             code("""{"bootstrapToken":"$secret"}"""),
             secret,

@@ -33,7 +33,7 @@ import java.util.Base64
 
 class OpenClawNodeConnectionTest {
     @Test
-    fun `native bootstrap challenge hello catalog invocation and result are a single authenticated flow`() = runTest {
+    fun `unpinned bootstrap saves grant and binding without sending another RPC or accepting tools`() = runTest {
         val fixture = Fixture(this)
         val node = fixture.node(setup = true)
         assertThat(fixture.sent).isEmpty()
@@ -42,26 +42,40 @@ class OpenClawNodeConnectionTest {
         val connect = fixture.sent.single().params()
         assertThat(connect["role"]).isEqualTo(JsonPrimitive("node"))
         assertThat(connect["scopes"].toString()).isEqualTo("[]")
+        assertThat(connect["caps"]).isNull()
+        assertThat(connect["client"]!!.jsonObject["id"]).isEqualTo(JsonPrimitive("node-host"))
+        assertThat(fixture.claim!!.clientId).isEqualTo("node-host")
         assertThat(connect["minProtocol"]).isEqualTo(JsonPrimitive(4))
         assertThat(connect["auth"]?.jsonObject?.keys).containsExactly("bootstrapToken")
         assertThat(fixture.claim!!.token).isEqualTo("synthetic-bootstrap")
         assertThat(fixture.claim!!.signedAtMs).isEqualTo(1234)
         assertThat(fixture.claim!!.nonce).isEqualTo("challenge-nonce")
         assertThat(fixture.paired).isFalse()
-        node.receive(fixture.response(hello()))
+        node.receive(fixture.response(hello(bootstrap = true)))
         assertThat(fixture.store.entry!!.token).isEqualTo("synthetic-device-token")
-        assertThat(node.phase.value).isEqualTo(OpenClawNodeConnection.Phase.PublishingTools)
-        assertThat(fixture.sent.last()["method"]).isEqualTo(JsonPrimitive("node.pluginTools.update"))
-        assertThat(fixture.paired).isFalse()
-        node.receive(fixture.response(json("{}")))
+        assertThat(fixture.sent).hasSize(1)
         assertThat(fixture.paired).isTrue()
         assertThat(node.phase.value).isEqualTo(OpenClawNodeConnection.Phase.Ready)
-        node.receive(
-            json(
-                """{"type":"event","event":"node.invoke.request","payload":{"id":"invoke-1","nodeId":"sample-node","command":"maps.search","paramsJSON":"{\"query\":\"Sample museum\"}"}}"""
-            ),
-            OpenClawInvokeDeadline(10_000) { 1234 },
-        )
+        assertThat(runCatching { node.receive(invocation(), validDeadline()) }.isFailure).isTrue()
+        assertThat(fixture.launcher.submissions).isEmpty()
+        assertThat(fixture.sent).hasSize(1)
+    }
+
+    @Test
+    fun `pinned reconnect waits for the catalog acknowledgement before handling tool requests`() = runTest {
+        val fixture = Fixture(this)
+        fixture.store.entry = savedGrant()
+        val node = fixture.node(setup = false)
+        node.receive(challenge())
+        node.receive(fixture.response(hello()))
+        assertThat(node.phase.value).isEqualTo(OpenClawNodeConnection.Phase.PublishingTools)
+        assertThat(fixture.sent.last()["method"]).isEqualTo(JsonPrimitive("node.pluginTools.update"))
+        assertThat(runCatching { node.receive(invocation(), validDeadline()) }.isFailure).isTrue()
+        assertThat(fixture.launcher.submissions).isEmpty()
+        node.receive(fixture.response(json("{}")))
+        assertThat(fixture.paired).isFalse()
+        assertThat(node.phase.value).isEqualTo(OpenClawNodeConnection.Phase.Ready)
+        node.receive(invocation(), validDeadline())
         assertThat(fixture.launcher.submissions).hasSize(1)
         assertThat(fixture.sent.last()["method"]).isEqualTo(JsonPrimitive("node.invoke.result"))
         assertThat(fixture.sent.last().params()["id"]).isEqualTo(JsonPrimitive("invoke-1"))
@@ -72,7 +86,8 @@ class OpenClawNodeConnectionTest {
     fun `ready native connection rejects an invocation without a confirmed finite live deadline`() = runTest {
         for (deadline in listOf(null, OpenClawInvokeDeadline(1) { 1 })) {
             val fixture = Fixture(this)
-            val node = fixture.node(setup = true)
+            fixture.store.entry = savedGrant()
+            val node = fixture.node(setup = false)
             node.receive(challenge())
             node.receive(fixture.response(hello()))
             node.receive(fixture.response(json("{}")))
@@ -86,7 +101,7 @@ class OpenClawNodeConnectionTest {
     @Test
     fun `reconnect uses deviceToken only and signs the exact same token`() = runTest {
         val fixture = Fixture(this)
-        fixture.store.entry = OpenClawDeviceAuthEntry("saved-device-token", "node", emptyList(), 1)
+        fixture.store.entry = savedGrant()
         fixture.node(setup = false).receive(challenge())
         val auth = fixture.sent.single().params()["auth"]!!.jsonObject
         assertThat(auth.keys).containsExactly("deviceToken")
@@ -110,7 +125,7 @@ class OpenClawNodeConnectionTest {
     }
 
     @Test
-    fun `operator role scopes wrong protocol missing token failed durable write and failed catalog cannot pair`() = runTest {
+    fun `wrong authority or failed durable write cannot pair and a rejected catalog cannot become ready`() = runTest {
         val invalid = listOf(
             hello().toString().replace("\"node\"", "\"operator\""),
             hello().toString().replace("\"scopes\":[]", "\"scopes\":[\"operator.admin\"]"),
@@ -133,11 +148,13 @@ class OpenClawNodeConnectionTest {
         assertThat(fixture.paired).isFalse()
         assertThat(fixture.sent).hasSize(1)
         val rejectedCatalog = Fixture(this)
-        val other = rejectedCatalog.node(true)
+        rejectedCatalog.store.entry = savedGrant()
+        val other = rejectedCatalog.node(false)
         other.receive(challenge())
         other.receive(rejectedCatalog.response(hello()))
         assertThat(runCatching { other.receive(rejectedCatalog.response(json("{}"), ok = false)) }.isFailure).isTrue()
         assertThat(rejectedCatalog.paired).isFalse()
+        assertThat(other.phase.value).isEqualTo(OpenClawNodeConnection.Phase.PublishingTools)
     }
 
     @Test
@@ -181,7 +198,10 @@ class OpenClawNodeConnectionTest {
                 OpenClawNodeTools(id, AndroidToolSession(DefaultAndroidToolbox(setOf(GoogleMapsToolModule()), scope.testCoroutineDispatchers()), launcher) {
                     if (current) setOf("maps") else emptySet()
                 })
-            }, if (setup) OpenClawNodeSetup.parse(code).getOrThrow() else null, { current }, { sent.add(it) }, { paired = true })
+            }, if (setup) OpenClawNodeSetup.parse(code).getOrThrow() else null, { current }, { sent.add(it) }, {
+                check(store.entry?.token == "synthetic-device-token")
+                paired = true
+            })
         }
 
         fun response(payload: JsonObject, ok: Boolean = true) = buildJsonObject {
@@ -214,7 +234,24 @@ class OpenClawNodeConnectionTest {
     companion object {
         private fun json(value: String) = Json.parseToJsonElement(value) as JsonObject
         private fun challenge() = json("""{"type":"event","event":"connect.challenge","payload":{"nonce":"challenge-nonce","ts":1234}}""")
-        private fun hello() = json("""{"type":"hello-ok","protocol":4,"auth":{"role":"node","scopes":[],"deviceToken":"synthetic-device-token"}}""")
+        private fun hello(bootstrap: Boolean = false) = buildJsonObject {
+            put("type", "hello-ok")
+            put("protocol", 4)
+            if (bootstrap) put("features", json("""{"methods":[],"events":[]}"""))
+            put("auth", json("""{"role":"node","scopes":[],"deviceToken":"synthetic-device-token"}"""))
+        }
+        private fun savedGrant() = OpenClawDeviceAuthEntry("saved-device-token", "node", emptyList(), 1)
+        private fun validDeadline() = OpenClawInvokeDeadline(10_000) { 1234 }
+        private fun invocation() = buildJsonObject {
+            put("type", "event")
+            put("event", "node.invoke.request")
+            put("payload", buildJsonObject {
+                put("id", "invoke-1")
+                put("nodeId", "sample-node")
+                put("command", "maps.search")
+                put("paramsJSON", """{"query":"Sample museum"}""")
+            })
+        }
         private fun JsonObject.params() = get("params")!!.jsonObject
     }
 }

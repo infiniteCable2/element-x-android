@@ -19,8 +19,8 @@ const cases = [
   { name: 'preserve-order-token-and-unicode', claim: { ...base, scopes: ['operator.write', 'operator.read'], token: ' token with spaces ', nonce: 'nonce-café', platform: '  İOS  ', deviceFamily: '  ÄPHONE  ' } },
   { name: 'empty-metadata-slots', claim: { ...base, signedAtMs: 1700000000001, platform: null, deviceFamily: null } },
   { name: 'native-unicode-whitespace', claim: { ...base, platform: '\u00a0 Android \u00a0', deviceFamily: '\t PHONE\n' } },
-  { name: 'node-bootstrap-connect', claim: { ...base, token: 'synthetic-bootstrap', platform: 'android', deviceFamily: 'phone' } },
-  { name: 'node-device-token-connect', claim: { ...base, token: 'synthetic-device-token', platform: 'android', deviceFamily: 'phone' } },
+  { name: 'node-bootstrap-connect', claim: { ...base, clientId: 'node-host', token: 'synthetic-bootstrap', platform: 'android', deviceFamily: 'phone' } },
+  { name: 'node-device-token-connect', claim: { ...base, clientId: 'node-host', token: 'synthetic-device-token', platform: 'android', deviceFamily: 'phone' } },
 ];
 const vectors = cases.map(({ name, claim }) => {
   const payload = buildDeviceAuthPayloadV3({ deviceId, ...claim });

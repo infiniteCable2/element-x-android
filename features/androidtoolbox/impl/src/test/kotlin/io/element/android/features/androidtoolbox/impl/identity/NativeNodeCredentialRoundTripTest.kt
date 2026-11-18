@@ -56,7 +56,7 @@ class NativeNodeCredentialRoundTripTest {
                 RecordingAndroidToolLauncher(),
             ) { setOf("maps") }
             val code = Base64.getUrlEncoder().withoutPadding().encodeToString(
-                """{"url":"wss://example.org","bootstrapToken":"synthetic-bootstrap"}""".toByteArray()
+                """{"url":"wss://example.org","bootstrapToken":"synthetic-bootstrap","expiresAtMs":1700000060000}""".toByteArray()
             )
             val connection = OpenClawNodeConnection(
                 "synthetic-gateway",
@@ -74,6 +74,8 @@ class NativeNodeCredentialRoundTripTest {
             ).jsonObject)
             val connect = sent.single()["params"]!!.jsonObject
             val proof = connect["device"]!!.jsonObject
+            assertThat(connect["client"]!!.jsonObject["id"]).isEqualTo(vector["claim"]!!.jsonObject["clientId"])
+            assertThat(connect["caps"]).isNull()
             assertThat(proof["id"]).isEqualTo(expected["deviceId"])
             assertThat(proof["publicKey"]).isEqualTo(expected["publicKey"])
             assertThat(proof["signature"]).isEqualTo(expected["signature"])
@@ -88,13 +90,17 @@ class NativeNodeCredentialRoundTripTest {
                     """{"type":"hello-ok","protocol":4,"auth":{"role":"node","scopes":[],"deviceToken":"synthetic-device-token"}}"""
                 ))
             })
-            assertThat(sent.last()["method"]).isEqualTo(JsonPrimitive("node.pluginTools.update"))
-            connection.receive(buildJsonObject {
-                put("type", "res")
-                put("id", checkNotNull(sent.last()["id"]))
-                put("ok", true)
-                put("payload", JsonObject(emptyMap()))
-            })
+            if (index == 0) {
+                assertThat(sent).hasSize(1)
+            } else {
+                assertThat(sent.last()["method"]).isEqualTo(JsonPrimitive("node.pluginTools.update"))
+                connection.receive(buildJsonObject {
+                    put("type", "res")
+                    put("id", checkNotNull(sent.last()["id"]))
+                    put("ok", true)
+                    put("payload", JsonObject(emptyMap()))
+                })
+            }
             assertThat(connection.phase.value).isEqualTo(OpenClawNodeConnection.Phase.Ready)
             connection.close()
             environment.close()
