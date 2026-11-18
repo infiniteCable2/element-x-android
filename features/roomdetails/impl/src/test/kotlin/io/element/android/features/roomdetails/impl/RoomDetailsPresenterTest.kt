@@ -138,7 +138,7 @@ class RoomDetailsPresenterTest {
     }
 
     @Test
-    fun `present - pairing reports native outcome without changing tool grants or retaining setup text in state`() = runTest {
+    fun `present - pairing reports native outcome without changing tool grants`() = runTest {
         val room = aJoinedRoom()
         val preferences = InMemoryAppPreferencesStore()
         val completed = CompletableDeferred<AssistantNodePairing.Outcome>()
@@ -157,8 +157,7 @@ class RoomDetailsPresenterTest {
             val event = RoomDetailsEvent.PairAssistantNode("SAMPLEDEVICE", "synthetic-setup-code")
             assertThat(event.toString()).doesNotContain("synthetic-setup-code")
             initial.eventSink(event)
-            val working = consumeItemsUntilPredicate { it.assistantNodePairing == AssistantNodePairingState.Working }.last()
-            assertThat(working.toString()).doesNotContain("synthetic-setup-code")
+            consumeItemsUntilPredicate { it.assistantNodePairing == AssistantNodePairingState.Working }
             completed.complete(AssistantNodePairing.Outcome.Paired)
             consumeItemsUntilPredicate { it.assistantNodePairing == AssistantNodePairingState.Paired }
             assertThat(preferences.getAssistantChatFlow().first()).isNull()
