@@ -66,8 +66,8 @@ import io.element.android.tests.testutils.lambda.value
 import io.element.android.tests.testutils.testCoroutineDispatchers
 import io.element.android.tests.testutils.testWithLifecycleOwner
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.TestScope
@@ -171,7 +171,11 @@ class RoomDetailsPresenterTest {
         val cancelled = CompletableDeferred<Unit>()
         val pairing = object : AssistantNodePairing {
             override suspend fun pair(sessionId: String, roomId: String, peerDeviceId: String, setupCode: String): AssistantNodePairing.Outcome {
-                try { awaitCancellation() } finally { cancelled.complete(Unit) }
+                try {
+                    awaitCancellation()
+                } finally {
+                    cancelled.complete(Unit)
+                }
             }
         }
         val presenter = createRoomDetailsPresenter(assistantNodePairing = pairing)

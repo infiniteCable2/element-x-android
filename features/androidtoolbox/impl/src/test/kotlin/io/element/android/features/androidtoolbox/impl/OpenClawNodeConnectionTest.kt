@@ -54,7 +54,11 @@ class OpenClawNodeConnectionTest {
         node.receive(fixture.response(json("{}")))
         assertThat(fixture.paired).isTrue()
         assertThat(node.phase.value).isEqualTo(OpenClawNodeConnection.Phase.Ready)
-        node.receive(json("""{"type":"event","event":"node.invoke.request","payload":{"id":"invoke-1","nodeId":"sample-node","command":"maps.search","paramsJSON":"{\"query\":\"Sample museum\"}"}}"""))
+        node.receive(
+            json(
+                """{"type":"event","event":"node.invoke.request","payload":{"id":"invoke-1","nodeId":"sample-node","command":"maps.search","paramsJSON":"{\"query\":\"Sample museum\"}"}}"""
+            )
+        )
         assertThat(fixture.launcher.submissions).hasSize(1)
         assertThat(fixture.sent.last()["method"]).isEqualTo(JsonPrimitive("node.invoke.result"))
         assertThat(fixture.sent.last().params()["id"]).isEqualTo(JsonPrimitive("invoke-1"))

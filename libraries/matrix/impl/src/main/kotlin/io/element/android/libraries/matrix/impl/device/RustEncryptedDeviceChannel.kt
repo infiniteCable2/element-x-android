@@ -16,8 +16,8 @@ import io.element.android.libraries.matrix.api.device.EncryptedDeviceMessage
 import io.element.android.libraries.matrix.api.device.MatrixDevicePeer
 import io.element.android.libraries.matrix.impl.RustMatrixClient
 import io.element.android.libraries.matrix.impl.util.cancelAndDestroy
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow

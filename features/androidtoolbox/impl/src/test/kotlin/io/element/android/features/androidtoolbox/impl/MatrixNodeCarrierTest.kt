@@ -48,9 +48,13 @@ class MatrixNodeCarrierTest {
     @Test
     fun `unknown fields negative string and fractional sequence fail closed`() {
         val invalid = listOf(
-            envelope("frame", -1), envelope("frame", 0).replace("\"seq\":0", "\"seq\":\"0\""),
+            envelope("frame", -1),
+            envelope("frame", 0).replace("\"seq\":0", "\"seq\":\"0\""),
             envelope("frame", 0).replace("\"seq\":0", "\"seq\":0.5"),
-            envelope("open"), envelope("close").dropLast(1) + ",\"extra\":true}", "[]", "invalid",
+            envelope("open"),
+            envelope("close").dropLast(1) + ",\"extra\":true}",
+            "[]",
+            "invalid",
         )
         invalid.forEach {
             val carrier = MatrixNodeCarrier(room, link)
@@ -79,7 +83,8 @@ class MatrixNodeCarrierTest {
         listOf(
             code("""{"url":"wss://example.org","token":"$secret"}"""),
             code("""{"url":"wss://example.org","bootstrapToken":"$secret","password":"other"}"""),
-            code("""{"bootstrapToken":"$secret"}"""), secret,
+            code("""{"bootstrapToken":"$secret"}"""),
+            secret,
         ).forEach {
             val result = OpenClawNodeSetup.parse(it)
             assertThat(result.isFailure).isTrue()

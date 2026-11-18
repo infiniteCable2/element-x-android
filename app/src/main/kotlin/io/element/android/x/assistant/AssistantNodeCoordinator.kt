@@ -36,8 +36,8 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.channels.ReceiveChannel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.produceIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.withContext
@@ -118,7 +118,10 @@ class AssistantNodeCoordinator(
                 if (executing && !pairingOnly && current()) selected()?.first?.toolCapabilities.orEmpty() else emptySet()
             }
             val connection = OpenClawNodeConnection(
-                binding.gatewayId, BuildConfig.VERSION_NAME, identities, credentials,
+                binding.gatewayId,
+                BuildConfig.VERSION_NAME,
+                identities,
+                credentials,
                 tools = { id -> OpenClawNodeTools(id, executeSession, catalogSession) },
                 setup = setup,
                 isCurrent = ::current,

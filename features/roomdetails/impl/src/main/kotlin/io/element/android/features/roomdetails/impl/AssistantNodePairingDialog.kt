@@ -67,14 +67,21 @@ private fun PairingContent(state: AssistantNodePairingState, onSubmit: (String, 
             Text(stringResource(R.string.screen_room_details_node_description))
             if (!paired) {
                 TextField(
-                    value = device, onValueChange = { if (it.length <= 255) device = it },
-                    label = stringResource(R.string.screen_room_details_node_device), singleLine = true, enabled = !working,
+                    value = device,
+                    onValueChange = { if (it.length <= 255) device = it },
+                    label = stringResource(R.string.screen_room_details_node_device),
+                    singleLine = true,
+                    enabled = !working,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 TextField(
-                    value = code, onValueChange = { if (it.length <= 16_384) code = it },
-                    label = stringResource(R.string.screen_room_details_node_code), singleLine = true, enabled = !working,
-                    visualTransformation = PasswordVisualTransformation(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                    value = code,
+                    onValueChange = { if (it.length <= 16_384) code = it },
+                    label = stringResource(R.string.screen_room_details_node_code),
+                    singleLine = true,
+                    enabled = !working,
+                    visualTransformation = PasswordVisualTransformation(),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
@@ -90,7 +97,8 @@ private fun PairingContent(state: AssistantNodePairingState, onSubmit: (String, 
             if (!paired) {
                 Button(
                     text = stringResource(R.string.screen_room_details_node_pair),
-                    enabled = !working && device.isNotBlank() && code.isNotBlank(), showProgress = working,
+                    enabled = !working && device.isNotBlank() && code.isNotBlank(),
+                    showProgress = working,
                     modifier = Modifier.fillMaxWidth(),
                     onClick = {
                         val submitted = code
@@ -101,7 +109,11 @@ private fun PairingContent(state: AssistantNodePairingState, onSubmit: (String, 
             }
             TextButton(
                 text = stringResource(if (paired) CommonStrings.action_done else CommonStrings.action_cancel),
-                onClick = { code = ""; onDismiss() }, modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    code = ""
+                    onDismiss()
+                },
+                modifier = Modifier.fillMaxWidth(),
             )
         }
     }

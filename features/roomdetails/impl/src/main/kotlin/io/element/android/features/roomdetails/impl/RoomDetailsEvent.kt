@@ -19,6 +19,7 @@ sealed interface RoomDetailsEvent {
     data class SetAssistantChatEnabled(val enabled: Boolean) : RoomDetailsEvent
     data class SetAssistantVoiceEnabled(val enabled: Boolean) : RoomDetailsEvent
     data class SetAssistantMapsEnabled(val enabled: Boolean) : RoomDetailsEvent
+
     // Secret-bearing event deliberately has no generated toString/copy/component methods.
     class PairAssistantNode(val deviceId: String, val setupCode: String) : RoomDetailsEvent
     data object CancelAssistantNodePairing : RoomDetailsEvent

@@ -81,8 +81,15 @@ class OpenClawNodeConnection(
         previousToken = saved?.token
         val token = if (initialSetup) checkNotNull(bootstrap) else saved?.token ?: fail()
         val proof = identities.signV3(OpenClawDeviceAuthClaim(
-            clientId = "openclaw-android", clientMode = "node", role = "node", scopes = emptyList(), signedAtMs = timestamp,
-            token = token, nonce = nonce, platform = "android", deviceFamily = "phone",
+            clientId = "openclaw-android",
+            clientMode = "node",
+            role = "node",
+            scopes = emptyList(),
+            signedAtMs = timestamp,
+            token = token,
+            nonce = nonce,
+            platform = "android",
+            deviceFamily = "phone",
         )).getOrThrow()
         check(proof.id == local.deviceId && proof.publicKey == local.publicKey) { "The node identity changed." }
         val adapter = tools(local.deviceId)

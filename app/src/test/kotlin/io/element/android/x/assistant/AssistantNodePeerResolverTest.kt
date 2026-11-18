@@ -63,10 +63,17 @@ class AssistantNodePeerResolverTest {
         coEvery { client.getJoinedRoom(chat.roomId) } returns room
         every { client.encryptionService } returns encryption
         every { room.info() } answers {
-            mockk { every { isDirect } returns direct; every { isEncrypted } returns encrypted; every { joinedMembersCount } returns count }
+            mockk {
+                every { isDirect } returns direct
+                every { isEncrypted } returns encrypted
+                every { joinedMembersCount } returns count
+            }
         }
         coEvery { room.getDirectRoomMember() } answers {
-            mockk<RoomMember> { every { userId } returns memberId; every { membership } returns this@AssistantNodePeerResolverTest.membership }
+            mockk<RoomMember> {
+                every { userId } returns memberId
+                every { membership } returns this@AssistantNodePeerResolverTest.membership
+            }
         }
         coEvery { encryption.getUserIdentity(any(), any()) } answers {
             afterIdentity()
