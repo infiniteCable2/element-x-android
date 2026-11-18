@@ -158,12 +158,16 @@ class AssistantNodeCoordinatorTest {
         }
         private val peers = mockk<AssistantNodePeerResolver> {
             coEvery { resolve(binding.sessionId, binding.roomId, binding.peerDeviceId) } answers {
-                if (!current) null else AssistantChat(
+                if (!current) {
+                    null
+                } else {
+                    AssistantChat(
                     SessionId(binding.sessionId),
                     RoomId(binding.roomId),
                     voiceEnabled = true,
                     toolCapabilities = if (mapsEnabled) setOf("maps") else emptySet(),
                 ) to binding
+                }
             }
         }
         private val identities = object : OpenClawDeviceIdentityStore {
@@ -242,7 +246,11 @@ class AssistantNodeCoordinatorTest {
         private var seq = 0L
         override val messages: Flow<EncryptedDeviceMessage> = flow {
             subscribed.complete(Unit)
-            try { for (message in input) emit(message) } finally { detached.complete(Unit) }
+            try {
+                for (message in input) emit(message)
+            } finally {
+                detached.complete(Unit)
+            }
         }
 
         override suspend fun awaitReady() = subscribed.await()
@@ -254,11 +262,16 @@ class AssistantNodeCoordinatorTest {
                 JsonPrimitive("open") -> {
                     envelope = value
                     opened.complete(Unit)
-                    if (answerOpen) frame(buildJsonObject {
+                    if (answerOpen) {
+                        frame(buildJsonObject {
                         put("type", "event")
                         put("event", "connect.challenge")
-                        put("payload", buildJsonObject { put("nonce", "sample-nonce"); put("ts", 1234) })
+                        put("payload", buildJsonObject {
+                            put("nonce", "sample-nonce")
+                            put("ts", 1234)
+                        })
                     })
+                    }
                 }
                 JsonPrimitive("close") -> closed = true
                 JsonPrimitive("frame") -> {

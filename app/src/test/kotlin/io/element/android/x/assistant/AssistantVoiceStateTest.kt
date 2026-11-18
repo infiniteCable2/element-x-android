@@ -52,10 +52,14 @@ class AssistantVoiceStateTest {
         assertThat(snapshot.isReadyAssistantNodePeer(presentation, peer.userId.value, "OTHER")).isFalse()
         assertThat(snapshot.isReadyAssistantNodePeer(presentation, "@other:example.org", "REMOTE")).isFalse()
         assertThat(snapshot.copy(isMicrophoneMuted = true).isReadyAssistantNodePeer(presentation, peer.userId.value, "REMOTE")).isTrue()
-        assertThat(snapshot.copy(roster = roster(peer.copy(connection = MatrixRtcConnectionState.CONNECTING)))
-            .isReadyAssistantNodePeer(presentation, peer.userId.value, "REMOTE")).isFalse()
-        assertThat(snapshot.copy(frameEncryption = persistentMapOf("peer" to MatrixRtcFrameEncryptionState.MISSING_KEY))
-            .isReadyAssistantNodePeer(presentation, peer.userId.value, "REMOTE")).isFalse()
+        assertThat(
+            snapshot.copy(roster = roster(peer.copy(connection = MatrixRtcConnectionState.CONNECTING)))
+            .isReadyAssistantNodePeer(presentation, peer.userId.value, "REMOTE")
+        ).isFalse()
+        assertThat(
+            snapshot.copy(frameEncryption = persistentMapOf("peer" to MatrixRtcFrameEncryptionState.MISSING_KEY))
+            .isReadyAssistantNodePeer(presentation, peer.userId.value, "REMOTE")
+        ).isFalse()
     }
 
     @Test
